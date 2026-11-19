@@ -28,7 +28,7 @@ ASSETS = {
     'index.html': 'text/html', 'admin.html': 'text/html', 'admin-setup.html': 'text/html', LOCAL_HTML: 'text/html',
     'core.js': 'text/javascript', 'app.js': 'text/javascript', 'file-demo.js': 'text/javascript',
     'panel.js': 'text/javascript', 'config.js': 'text/javascript', 'vendor/supabase.js': 'text/javascript',
-    'panel.css': 'text/css', 'rotina.css': 'text/css', 'rotina.js': 'text/javascript',
+    'panel.css': 'text/css', 'identity.css': 'text/css', 'rotina.css': 'text/css', 'rotina.js': 'text/javascript',
 }
 PROVIDERS = {
     'brasilapi': 'https://brasilapi.com.br/api/cnpj/v1/',

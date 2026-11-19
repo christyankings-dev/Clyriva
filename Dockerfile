@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir -r requirements.txt
-COPY index.html admin.html config.js app.js core.js rotina.js panel.js panel.css rotina.css servidor.py ./
+COPY index.html admin.html config.js app.js core.js rotina.js panel.js panel.css rotina.css identity.css servidor.py ./
 COPY vendor/supabase.js ./vendor/supabase.js
 RUN python -m py_compile servidor.py
 EXPOSE 8080
