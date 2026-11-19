@@ -4,7 +4,7 @@ s=p.read_text(encoding='utf-8')
 assert 'async function resetClientPassword(' not in s, 'Rotina ja instalada, nao duplicar'
 d='$'
 old='<button class="button danger sm" data-revoke="'+d+'{esc(a.client_id)}" data-email="'+d+'{esc(a.email)}">Remover</button>'
-new=d+'{a.enabled?'+String.fromCharCode(96)+'<button class="button secondary sm" data-reset="'+d+'{esc(a.client_id)}" data-email="'+d+'{esc(a.email)}">Redefinir senha</button>'+String.fromCharCode(96)+':""} '+old
+new=d+'{a.enabled?'+chr(96)+'<button class="button secondary sm" data-reset="'+d+'{esc(a.client_id)}" data-email="'+d+'{esc(a.email)}">Redefinir senha</button>'+chr(96)+':""} '+old
 assert s.count(old)==1,('button',s.count(old))
 s=s.replace(old,new)
 old2="host.querySelectorAll('[data-revoke]').forEach(b=>b.onclick=()=>revokeAccess(b.dataset.revoke,b.dataset.email));"
