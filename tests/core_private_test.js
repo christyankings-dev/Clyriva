@@ -1,0 +1,15 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const c={window:{},Intl};vm.createContext(c);
+vm.runInContext(fs.readFileSync(require('path').join(__dirname,'../core.js'),'utf8'),c);
+const core=c.window.ClyrivaCore;
+assert.strictEqual(core.cents('1.05'),105);
+assert.strictEqual(core.cents('0.01'),1);
+assert.strictEqual(core.cents('0'),0);
+assert.ok(Number.isNaN(core.cents('0.145')));
+assert.ok(Number.isNaN(core.cents('1e3')));
+assert.ok(Number.isNaN(core.cents('0x10')));
+assert.ok(Number.isNaN(core.cents(' 10 ')));
+assert.ok(Number.isNaN(core.cents('-1')));
+assert.throws(()=>core.workspace({version:1,clients:[{id:'c',name:'Teste',start:'2026-02-30'}],invoices:[],cash:[],tasks:[],fees:[],taxes:[]}),/data inválida/);
+assert.throws(()=>core.workspace({version:1,clients:[{id:'c',name:'Teste',monthlyFee:1.005}],invoices:[],cash:[],tasks:[],fees:[],taxes:[]}),/valor inválido/);
+console.log('OK — valores monetários, datas e validação do core');

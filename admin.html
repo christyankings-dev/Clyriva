@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<!-- clyriva-runtime -->
+<meta name="referrer" content="no-referrer">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#102c37">
+<meta name="description" content="Clyriva - seu painel particular de gestão de clientes, notas fiscais, recebimentos, honorários e obrigações.">
+<title>Clyriva • Administração</title>
+<link rel="stylesheet" href="panel.css">
+<link rel="stylesheet" href="rotina.css">
+</head>
+<body data-mode="online">
+<div id="panel-status" role="status">Abrindo painel…</div>
+<div class="shell">
+  <aside class="side" id="side">
+    <div class="brand"><div class="brandmark"><span>c</span><i></i></div><div><strong>clyriva<span>.</span></strong><small>GESTÃO DE CLIENTES</small></div></div>
+    <div class="side-label">GESTÃO</div>
+    <nav id="nav" aria-label="Menu principal">
+      <button data-page="dashboard" class="nav on"><span class="nav-icon">▦</span>Visão geral</button>
+      <button data-page="clients" class="nav"><span class="nav-icon">▤</span>Meus clientes</button>
+      <button data-page="vault" class="nav"><span class="nav-icon">♙</span>Cofre de acessos</button>
+      <button data-page="invoices" class="nav"><span class="nav-icon">▧</span>Notas fiscais</button>
+      <button data-page="cash" class="nav"><span class="nav-icon">⇄</span>Financeiro dos clientes</button>
+      <button data-page="fees" class="nav"><span class="nav-icon">◈</span>Meus honorários</button>
+      <button data-page="taxes" class="nav"><span class="nav-icon">▣</span>Guias e tributos</button>
+      <button data-page="tasks" class="nav"><span class="nav-icon">☑</span>Obrigações e pendências</button>
+      <button data-page="reports" class="nav"><span class="nav-icon">▥</span>Relatórios</button>
+    </nav>
+    <div class="side-label second">PREFERÊNCIAS</div>
+    <nav><button data-page="settings" class="nav"><span class="nav-icon">⚙</span>Dados e backup</button></nav>
+    <div class="sidebar-bottom"><div class="local-dot"></div><div><strong>Espaço particular</strong><span>Sincronização pelo portal</span></div></div>
+  </aside>
+  <div class="body-area">
+    <header class="topbar">
+      <button class="hamb" id="hamb" aria-label="Abrir navegação">☰</button>
+      <div class="breadcrumb">MINHA GESTÃO <span>/</span> <b id="breadcrumb">Visão geral</b></div>
+      <div class="top-filters">
+        <label class="top-field">Competência <input id="month" type="month" aria-label="Competência"></label>
+        <label class="top-field">Cliente <select id="client-filter" aria-label="Filtrar cliente"></select></label>
+      </div>
+    </header>
+    <main id="page" tabindex="-1"></main>
+    <footer>CLYRIVA V1.7 · Painel para gestão administrativa. Não substitui sistemas fiscais oficiais. <span>Faça backups regularmente.</span></footer>
+  </div>
+</div>
+<div id="modal-root"></div><div id="toast-root" aria-live="polite"></div><input id="import-file" type="file" accept="application/json,.json" hidden>
+<script src="core.js"></script>
+<script src="rotina.js"></script>
+<script src="panel.js"></script>
+</body>
+</html>

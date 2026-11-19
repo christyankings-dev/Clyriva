@@ -1,0 +1,11 @@
+*.zip
+*.pdf
+.env
+.env.*
+.git
+__pycache__/
+*.pyc
+tests/
+db/
+*.md
+railway.json
