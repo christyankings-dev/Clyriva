@@ -132,8 +132,8 @@ def main():
     op("client-attachment-link",alice,{"attachmentId":public_file},(404,))
     w["taxes"][0].update(status="paid",paidAt="2026-11-20"); save()
     assert op("client-list",alice)["notices"][0]["status"]=="paid"
-    conflict=rpc("clyriva_commit",admin,{"p_expected":rev-1,"p_workspace":w,"p_vault":None},(400,409,500))
-    assert conflict["code"]=="40001" and rpc("clyriva_load",admin)["revision"]==rev
+    conflict=rpc("clyriva_commit",admin,{"p_expected":rev-1,"p_workspace":w,"p_vault":None},(409,))
+    assert conflict["code"]=="PT409" and rpc("clyriva_load",admin)["revision"]==rev
     w["taxes"][0].update(status="open",paidAt="",value=95); save()
     bill=op("client-list",alice)["notices"][0]
     assert bill["status"]=="active" and bill["amount_cents"]==9500

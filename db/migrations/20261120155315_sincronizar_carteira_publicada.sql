@@ -25,13 +25,20 @@ do $guard$
 declare definition text;
 begin
  definition:=pg_get_functiondef('public.clyriva_commit(bigint,jsonb,jsonb)'::regprocedure);
- if position('A revisão confirmada diverge da carteira gravada.' in definition)>0 then return; end if;
- if position('return actual;' in definition)=0 then raise exception 'Contrato de clyriva_commit divergente'; end if;
- execute replace(definition,'return actual;',
+ -- Conflito de edição é definitivo para a revisão antiga. A API deve responder HTTP 409.
+ definition:=replace(definition,
+   $old$raise exception 'A carteira mudou em outra aba. Recarregue antes de salvar.' using errcode='40001'$old$,
+   $new$raise exception 'A carteira mudou em outra aba. Recarregue antes de salvar.' using errcode='PT409'$new$);
+ if position($new$Recarregue antes de salvar.' using errcode='PT409'$new$ in definition)=0 then raise exception 'Conferir o contrato de revisão antes de migrar'; end if;
+ if position('A revisão confirmada diverge da carteira gravada.' in definition)=0 then
+   if position('return actual;' in definition)=0 then raise exception 'Contrato de clyriva_commit divergente'; end if;
+   definition:=replace(definition,'return actual;',
    $body$if not exists(select 1 from public.clyriva_workspace w where w.admin_id=a and w.revision=actual) then
-     raise exception 'A revisão confirmada diverge da carteira gravada.' using errcode='40001';
+     raise exception 'A revisão confirmada diverge da carteira gravada.' using errcode='PT409';
    end if;
    return actual;$body$);
+ end if;
+ execute definition;
 end $guard$;
 
 -- Coordena alterações na carteira e no app na mesma transação, inclusive ao restaurar uma revisão.
@@ -107,7 +114,7 @@ begin
   select w.payload into portfolio from public.clyriva_workspace w where w.admin_id=new.admin_id for share;
   if not exists (select 1 from jsonb_array_elements(portfolio->'clients') c
                  where c->>'id'=new.client_id and c->>'status' is distinct from 'inactive') then
-    raise exception 'Empresa indisponível para publicação' using errcode='40001';
+    raise exception 'Empresa indisponível para publicação' using errcode='PT409';
   end if;
   select r into source_row from jsonb_array_elements(
     portfolio->(case new.source_type when 'tax' then 'taxes' when 'task' then 'tasks' end)
@@ -117,7 +124,7 @@ begin
          or new.status is distinct from case when source_row->>'status'='paid' then 'paid' else 'active' end))
      or (new.source_type='task' and (new.title is distinct from left(source_row->>'title',140)
          or new.status is distinct from case when source_row->>'status'='done' then 'archived' else 'active' end)) then
-    raise exception 'O lançamento mudou durante a publicação' using errcode='40001';
+    raise exception 'O lançamento mudou durante a publicação' using errcode='PT409';
   end if;
   return new;
 end;
