@@ -4,6 +4,7 @@ const $=s=>document.querySelector(s),config=window.CLYRIVA_CONFIG||{};
 const base=String(config.supabaseUrl||'').replace(/\/$/,'')+'/functions/v1/clyriva-client';
 const sb=window.supabase.createClient(config.supabaseUrl,config.supabaseAnonKey,{auth:{autoRefreshToken:true,persistSession:true,storageKey:'clyriva-client-auth-v2',detectSessionInUrl:false}});
 let deferred=null,registration=null,loaded=false,acting=false;
+function clearClientScreen(){loaded=false;for(const id of ['#client-notices','#client-billing-overview']){const area=$(id);if(area)area.replaceChildren();}for(const id of ['#c-password','#c-email']){const field=$(id);if(field)field.value='';}const pwd=$('#client-password-form');if(pwd)pwd.reset();const show=$('#client-show-amount');if(show)show.checked=false;view(false);}
 const ios=/iPad|iPhone|iPod/.test(navigator.userAgent);
 const standalone=()=>window.matchMedia?.('(display-mode: standalone)').matches||navigator.standalone===true;
 const status=(sel,msg,err=false)=>{const el=$(sel);if(el){el.textContent=msg;el.classList.toggle('error',!!err);}};
@@ -31,22 +32,40 @@ function noticeCard(n,company){
  card.append(meta);return card;
 }
 
+async function refreshPushPreference(){
+ if(!supported())return;
+ try{
+  const worker=await ready(),subscription=await worker.pushManager.getSubscription();
+  if(!subscription)return;
+  const preference=await api('client-push-status',{endpoint:subscription.endpoint});
+  if(preference.enabled){$('#client-show-amount').checked=preference.showAmount===true;status('#push-feedback','Notificações já ativadas neste aparelho.');}
+ }catch{/* Falha de consulta das preferencias nao deve bloquear acesso aos avisos. */}
+}
 async function refresh(){
  const data=await api('client-list');const area=$('#client-notices');area.replaceChildren();
  const byClient=new Map((data.companies||[]).map(c=>[c.admin_id+'|'+c.client_id,c.company]));
  const notices=Array.isArray(data.notices)?data.notices:[];
- if(!notices.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='Nenhum aviso publicado para sua empresa até o momento.';area.append(empty);}
- else for(const notice of notices)area.append(noticeCard(notice,byClient.get(notice.admin_id+'|'+notice.client_id)||'Sua empresa'));
+ const filter=$('#client-notice-filter')?.value||'pending';
+ const localItems=notices.filter(n=>filter==='all'||(filter==='paid'?n.status==='paid':n.status!=='paid'));
+ const rank=n=>n.status==='paid'?3:n.reminder_enabled&&n.due_date?(daysRemaining(n.due_date)<0?0:daysRemaining(n.due_date)<=3?1:2):2;
+ localItems.sort((a,b)=>rank(a)-rank(b)||String(a.due_date||'9999').localeCompare(String(b.due_date||'9999'))||String(b.created_at||'').localeCompare(String(a.created_at||'')));
+ const pending=notices.filter(n=>n.reminder_enabled&&n.status==='active');
+ const overdue=pending.filter(n=>daysRemaining(n.due_date)<0);
+ const next3=pending.filter(n=>{const days=daysRemaining(n.due_date);return days>=0&&days<=3;});
+ const overview=$('#client-billing-overview');if(overview){overview.replaceChildren();for(const [label,number] of [['Em aberto',pending.length],['Próximos 3 dias',next3.length],['Vencidos',overdue.length],['Pagos',notices.filter(n=>n.status==='paid').length]]){const item=document.createElement('div');item.className='summary-item';const num=document.createElement('strong');num.textContent=String(number);const txt=document.createElement('span');txt.textContent=label;item.append(num,txt);overview.append(item);}}
+ if(!localItems.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='Nenhum aviso publicado para sua empresa até o momento.';area.append(empty);}
+ else for(const notice of localItems)area.append(noticeCard(notice,byClient.get(notice.admin_id+'|'+notice.client_id)||'Sua empresa'));
  status('#client-feedback',`${(data.companies||[]).length} empresa(s) autorizada(s) · ${notices.length} aviso(s).`);
- loaded=true;view(true);
+ loaded=true;view(true);refreshPushPreference();
 }
 async function signIn(e){e.preventDefault();if(acting)return;acting=true;const btn=$('#client-login button[type="submit"]');btn.disabled=true;
- try{const {error}=await sb.auth.signInWithPassword({email:$('#c-email').value.trim().toLowerCase(),password:$('#c-password').value});if(error)throw error;await refresh();$('#c-password').value='';status('#login-feedback','');}
- catch(err){view(false);status('#login-feedback',err.message||'Não foi possível entrar.',true);}
+ try{if(supported()){try{if(registration){const subscription=await registration.pushManager.getSubscription();if(subscription)await subscription.unsubscribe();}}catch{}}
+ const {error}=await sb.auth.signInWithPassword({email:$('#c-email').value.trim().toLowerCase(),password:$('#c-password').value});if(error)throw error;await refresh();$('#c-password').value='';status('#login-feedback','');}
+ catch(err){clearClientScreen();status('#login-feedback',err.message||'Não foi possível entrar.',true);}
  finally{acting=false;btn.disabled=false;}
 }
 const supported=()=>window.isSecureContext&&('serviceWorker' in navigator);
-async function ready(){if(!supported())throw Error('Este navegador não suporta aplicativos seguros.');return registration||navigator.serviceWorker.ready;}
+async function ready(){if(!supported())throw Error('Este navegador não suporta aplicativos seguros.');if(registration)return registration;return Promise.race([navigator.serviceWorker.ready,new Promise((_,reject)=>setTimeout(()=>reject(Error('Instalação de notificações indisponível neste navegador.')),6500))]);}
 function decodeBase64(str){const txt=atob((str+'='.repeat((4-str.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(txt,c=>c.charCodeAt(0));}
 async function enable(){const b=$('#client-push-enable');b.disabled=true;
  try{
@@ -64,13 +83,26 @@ async function enable(){const b=$('#client-push-enable');b.disabled=true;
 async function test(){const b=$('#client-push-test');b.disabled=true;try{const worker=await ready(),sub=await worker.pushManager.getSubscription();if(!sub)throw Error('Ative as notificações primeiro.');await api('client-test',{endpoint:sub.endpoint});status('#push-feedback','Teste enviado. Verifique os avisos do celular.');}catch(e){status('#push-feedback',e.message,true);}finally{b.disabled=false;}}
 async function disable(){const b=$('#client-push-disable');b.disabled=true;try{const worker=await ready(),sub=await worker.pushManager.getSubscription();if(!sub){status('#push-feedback','Nenhuma notificação ativa.');return;}await api('client-unsubscribe',{endpoint:sub.endpoint});await sub.unsubscribe();status('#push-feedback','Notificações desativadas neste aparelho.');}catch(e){status('#push-feedback',e.message,true);}finally{b.disabled=false;}}
 async function logout(){
- // Antes de encerrar a sessão, desassociar a assinatura para evitar alertas a quem usar este celular depois.
- try{const worker=await ready(),sub=await worker.pushManager.getSubscription();if(sub){await api('client-unsubscribe',{endpoint:sub.endpoint});await sub.unsubscribe();}}catch(e){status('#client-feedback','Aviso: não foi possível desativar as notificações neste aparelho. Desative-as nas configurações do navegador.',true);}
- await sb.auth.signOut({scope:'local'});loaded=false;view(false);status('#login-feedback','Sessão encerrada.');
+ // A assinatura local sempre deve ser removida, MESMO quando a API estiver indisponivel.
+ // Caso contrario um aparelho compartilhado pode seguir recebendo notificacoes da conta anterior.
+ let warning='';
+ try{
+  const sub=registration?await registration.pushManager.getSubscription():null;
+  if(sub){
+   try{await api('client-unsubscribe',{endpoint:sub.endpoint});}
+   catch{warning='O aviso foi desativado neste celular, mas a confirmação no servidor ficou pendente.';}
+   const removed=await sub.unsubscribe();
+   if(!removed)warning='Não foi possível cancelar a assinatura no celular; desative notificações nas configurações do navegador.';
+  }
+ }catch{warning='Não foi possível confirmar a desativação das notificações neste aparelho.';}
+ try{await sb.auth.signOut({scope:'local'});}finally{clearClientScreen();status('#login-feedback',warning||'Sessão encerrada.',!!warning);}
 }
-async function changePassword(){const p=window.prompt('Digite a nova senha (mínimo de 12 caracteres):');if(p===null)return;if(p.length<12)return status('#client-feedback','A senha precisa ter pelo menos 12 caracteres.',true);
- const again=window.prompt('Repita a nova senha:');if(p!==again)return status('#client-feedback','As senhas não coincidem.',true);
- const {error}=await sb.auth.updateUser({password:p});status('#client-feedback',error?error.message:'Senha alterada com sucesso.',!!error);
+
+async function changePassword(e){e.preventDefault();const f=e.currentTarget,first=f.elements.newPassword.value,second=f.elements.confirmPassword.value,button=f.querySelector('button[type=submit]');
+ if(first.length<12||first!==second)return status('#client-feedback','Confira a senha de 12 ou mais caracteres e a confirmação.',true);
+ button.disabled=true;
+ try{const {error}=await sb.auth.updateUser({password:first});if(error)throw error;f.reset();status('#client-feedback','Senha alterada com sucesso.');}
+ catch(err){status('#client-feedback',err.message||'Não foi possível alterar a senha.',true);}finally{button.disabled=false;}
 }
 async function install(){if(standalone()){status('#push-feedback','O aplicativo já está instalado.');return;}
  if(deferred){const prompt=deferred;deferred=null;prompt.prompt();const result=await prompt.userChoice;status('#push-feedback',result.outcome==='accepted'?'Instalação iniciada.':'Instalação cancelada.');return;}
@@ -78,8 +110,11 @@ async function install(){if(standalone()){status('#push-feedback','O aplicativo 
 }
 async function init(){
  $('#client-login').addEventListener('submit',signIn);$('#client-refresh').addEventListener('click',()=>refresh().catch(e=>status('#client-feedback',e.message,true)));
+ $('#client-show-amount').addEventListener('change',()=>{status('#push-feedback','Para salvar a preferência de privacidade neste celular, toque em Ativar notificações.');});
  $('#client-push-enable').addEventListener('click',enable);$('#client-push-test').addEventListener('click',test);$('#client-push-disable').addEventListener('click',disable);
- $('#client-install').addEventListener('click',install);$('#client-change-password').addEventListener('click',()=>changePassword().catch(e=>status('#client-feedback',e.message,true)));
+ $('#client-install').addEventListener('click',install);$('#client-password-form').addEventListener('submit',changePassword);
+ $('#client-notice-filter').addEventListener('change',()=>refresh().catch(e=>status('#client-feedback',e.message,true)));
+ sb.auth.onAuthStateChange((event)=>{if(event==='SIGNED_OUT')clearClientScreen();});
  $('#client-logout').addEventListener('click',logout);
  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;});
  if(supported())registration=await navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(()=>null);

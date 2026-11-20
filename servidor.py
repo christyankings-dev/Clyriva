@@ -130,10 +130,11 @@ def lookup(provider, cnpj, ip):
 
 def security_headers():
     fields = {'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
+              'Cross-Origin-Resource-Policy':'same-origin',
               'X-Frame-Options':'SAMEORIGIN','Permissions-Policy':'camera=(), microphone=(), geolocation=()'}
     if os.getenv('CLYRIVA_ENV') == 'production':
         fields['Strict-Transport-Security'] = 'max-age=31536000'
-        fields['Content-Security-Policy-Report-Only' if os.getenv('CLYRIVA_CSP') != 'enforce' else 'Content-Security-Policy'] = CSP
+        fields['Content-Security-Policy-Report-Only' if os.getenv('CLYRIVA_CSP') == 'report' else 'Content-Security-Policy'] = CSP
     else:
         fields['Content-Security-Policy'] = "frame-ancestors 'self'; object-src 'none'; base-uri 'self'"
     return fields

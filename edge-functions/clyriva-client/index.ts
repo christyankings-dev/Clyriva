@@ -68,7 +68,16 @@ async function adminHandler(uid:string,action:string,body:any){
  const payload=await workspace(uid),customers=Array.isArray(payload?.clients)?payload.clients:[];
  const clientId=String(body?.clientId||'').trim();
  if(action==='list'){
-  const {data:grants,error:e1}=await db.from('clyriva_client_access').select('client_id,email,enabled,created_at').eq('admin_id',uid).order('created_at',{ascending:false}).limit(300);
+  const {data:grants,error:e1}=await db.from('clyriva_client_access').select('client_id,email,enabled,created_at,last_password_reset_at,user_id').eq('admin_id',uid).order('created_at',{ascending:false}).limit(300);
+  const users=[...new Set((grants||[]).filter(x=>x.enabled&&x.user_id).map(x=>x.user_id))];
+  const deviceCount=new Map<string,number>();
+  if(users.length){
+   const {data:devices,error:dErr}=await db.from('clyriva_client_push_subscriptions')
+     .select('user_id').in('user_id',users).eq('enabled',true).limit(500);
+   if(dErr)throw dErr;
+   for(const d of devices||[])deviceCount.set(d.user_id,(deviceCount.get(d.user_id)||0)+1);
+  }
+  const publicGrants=(grants||[]).map(({user_id,...access})=>({...access,active_devices:user_id?deviceCount.get(user_id)||0:0}));
   const {data:notices,error:e2}=await db.from('clyriva_client_notices').select('id,client_id,title,body,due_date,status,created_at,notice_type,amount_cents,reminder_enabled,paid_at').eq('admin_id',uid).order('created_at',{ascending:false}).limit(300);
   if(e1||e2)throw e1||e2;
   // Auditoria dos lembretes: exibir apenas o ultimo disparo aceito pelo gateway,
@@ -82,12 +91,37 @@ async function adminHandler(uid:string,action:string,body:any){
    if(e3)throw e3;
    for(const entry of logs||[])if(!last.has(entry.notice_id))last.set(entry.notice_id,{date:entry.delivery_date,daysBefore:entry.days_before,at:entry.sent_at});
   }
-  return response({ok:true,companies:customers.map((x:any)=>({id:x.id,name:x.name,status:x.status})).filter((x:any)=>x.id),grants:grants||[],notices:(notices||[]).map(n=>({...n,last_delivery:last.get(n.id)||null}))});
+  return response({ok:true,companies:customers.map((x:any)=>({id:x.id,name:x.name,status:x.status})).filter((x:any)=>x.id),grants:publicGrants,notices:(notices||[]).map(n=>({...n,last_delivery:last.get(n.id)||null}))});
  }
  if(action==='revoke'){
   const email=String(body?.email||'').trim().toLowerCase();if(!clientId||!emailValid(email))return fail('Empresa ou e-mail inválido.');
-  const {error:e}=await db.from('clyriva_client_access').update({enabled:false}).eq('admin_id',uid).eq('client_id',clientId).eq('email',email);
-  return e?fail('Não foi possível revogar o acesso.',500):response({ok:true});
+  const {data:grants,error:e}=await db.from('clyriva_client_access').update({enabled:false}).eq('admin_id',uid).eq('client_id',clientId).eq('email',email).select('user_id');
+  if(e)return fail('Não foi possível revogar o acesso.',500);
+  for(const grant of grants||[]){if(grant.user_id&&!(await activeGrants(grant.user_id)).length){
+    const {error:cleanup}=await db.from('clyriva_client_push_subscriptions').delete().eq('user_id',grant.user_id);
+    if(cleanup)console.error('Nao foi possivel eliminar todas as inscricoes apos revogacao.');
+  }}
+  return response({ok:true});
+ }
+ if(action==='reset-access'){
+  const email=String(body?.email||'').trim().toLowerCase();
+  if(!clientId||!emailValid(email))return fail('Informe a empresa e o e-mail autorizado.');
+  const {data:grant,error:gErr}=await db.from('clyriva_client_access')
+    .select('user_id,email,enabled,last_password_reset_at')
+    .eq('admin_id',uid).eq('client_id',clientId).eq('email',email).maybeSingle();
+  if(gErr||!grant?.enabled||!grant.user_id)return fail('Acesso ativo não encontrado.',404);
+  if(grant.last_password_reset_at&&Date.now()-Date.parse(grant.last_password_reset_at)<120000)
+    return fail('Aguarde dois minutos para repetir a redefinição.',429);
+  if(await isAdmin(grant.user_id))return fail('Uma senha administrativa não pode ser redefinida por este caminho.',403);
+  const {data:found,error:uErr}=await db.auth.admin.getUserById(grant.user_id);
+  if(uErr||found?.user?.email?.toLowerCase()!==email)return fail('A conta vinculada deve ser regularizada.',409);
+  const temporaryPassword=password();
+  const {error:resetError}=await db.auth.admin.updateUserById(grant.user_id,{password:temporaryPassword});
+  if(resetError)return fail('Não foi possível criar uma nova senha.',500);
+  const {error:stampError}=await db.from('clyriva_client_access').update({last_password_reset_at:new Date().toISOString()})
+    .eq('admin_id',uid).eq('client_id',clientId).eq('email',email);
+  if(stampError)console.error('Redefinição feita, registro de data pendente.');
+  return response({ok:true,email,temporaryPassword,loginUrl:APP+'/cliente.html'});
  }
  if(action==='mark-paid'){
   const id=String(body?.noticeId||'');if(!/^[0-9a-f-]{36}$/i.test(id))return fail('Cobrança inválida.');
@@ -121,6 +155,11 @@ async function adminHandler(uid:string,action:string,body:any){
   }
   if(existing?.id&&await isAdmin(existing.id))return fail('O endereço já pertence a um administrador.',403);
   if(existing&&!existing.email_confirmed_at)return fail('Conta existente aguarda confirmação. Escolha outro e-mail ou regularize pelo Supabase.',409);
+  if(existing){
+    const {data:link,error:linkError}=await db.from('clyriva_client_access').select('user_id').eq('user_id',existing.id).limit(1);
+    if(linkError)throw linkError;
+    if(!link?.length)return fail('E-mail já possui outra conta neste projeto. Escolha outro endereço ou regularize manualmente.',409);
+  }
   let id=existing?.id,temporaryPassword:string|null=null,created=false;
   if(!id){temporaryPassword=password();const {data,error:e}=await db.auth.admin.createUser({email,password:temporaryPassword,email_confirm:true});if(e||!data.user?.id)return fail('Não foi possível criar o login do cliente.',409);id=data.user.id;created=true;}
   const {error:e}=await db.from('clyriva_client_access').upsert({admin_id:uid,client_id:clientId,email,user_id:id,enabled:true},{onConflict:'admin_id,client_id,email'});
@@ -129,7 +168,21 @@ async function adminHandler(uid:string,action:string,body:any){
  }
  if(action==='create-charge'){
   const values=chargeFields(body);if(!values)return fail('Informe tipo, descrição, valor positivo e uma data válida.');
-  const {data,error:e}=await db.from('clyriva_client_notices').insert({admin_id:uid,client_id:clientId,...values,status:'active',reminder_enabled:true}).select('id').single();
+  const rawKey=String(body?.requestKey||'').trim();
+  if(rawKey&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(rawKey))return fail('Identificador da operação inválido.');
+  const key=rawKey||crypto.randomUUID();
+  const {data,error:e}=await db.from('clyriva_client_notices')
+    .insert({admin_id:uid,client_id:clientId,...values,status:'active',reminder_enabled:true,request_key:key}).select('id').single();
+  if(e?.code==='23505'){
+   const {data:previous,error:readError}=await db.from('clyriva_client_notices')
+     .select('id,client_id,title,body,due_date,notice_type,amount_cents,status').eq('admin_id',uid).eq('request_key',key).maybeSingle();
+   if(readError||!previous)return fail('Não foi possível confirmar o cadastro. Atualize a lista de cobranças.',409);
+   const identical=previous.client_id===clientId && previous.title===values.title
+      && previous.body===values.body && previous.due_date===values.due_date
+      && previous.notice_type===values.notice_type && Number(previous.amount_cents)===Number(values.amount_cents);
+   if(!identical)return fail('Esta operação já foi utilizada em outro cadastro. Atualize a página antes de tentar novamente.',409);
+   return response({ok:true,noticeId:previous.id,alreadyExists:true,reminderDays:[3,2,1,0]});
+  }
   if(e||!data)return fail('Não foi possível cadastrar a cobrança.',500);
   return response({ok:true,noticeId:data.id,reminderDays:[3,2,1,0]});
  }
@@ -157,11 +210,23 @@ async function clientHandler(uid:string,action:string,body:any){
  }
  if(action==='subscribe'){
   const sub=body?.subscription;if(!subscriptionValid(sub))return fail('Assinatura inválida.');
+  const {data:prior,error:existingError}=await db.from('clyriva_client_push_subscriptions')
+    .select('user_id,p256dh,auth_secret').eq('endpoint',sub.endpoint).maybeSingle();
+  if(existingError)throw existingError;
+  if(prior&&prior.user_id!==uid)
+    return fail('Este aparelho ainda está associado a outra conta. Encerre a sessão anterior ou redefina a permissão de notificação no navegador.',409);
   const {error:e}=await db.from('clyriva_client_push_subscriptions').upsert({user_id:uid,endpoint:sub.endpoint,p256dh:sub.keys.p256dh,auth_secret:sub.keys.auth,enabled:true,show_amount:body?.showAmount===true,updated_at:new Date().toISOString()},{onConflict:'endpoint'});
   if(e)return fail('Não foi possível ativar notificações.',500);
   // Uma mesma assinatura de navegador nao deve ser entregue a dois tipos de usuario.
   await db.from('clyriva_push_subscriptions').delete().eq('endpoint',sub.endpoint);
   return response({ok:true});
+ }
+ if(action==='push-status'){
+  if(!validEndpoint(body?.endpoint))return fail('Dispositivo inválido.');
+  const {data,error:e}=await db.from('clyriva_client_push_subscriptions')
+    .select('enabled,show_amount').eq('endpoint',body.endpoint).eq('user_id',uid).maybeSingle();
+  if(e)throw e;
+  return response({ok:true,enabled:data?.enabled===true,showAmount:data?.show_amount===true});
  }
  if(action==='unsubscribe'){
   if(!validEndpoint(body?.endpoint))return fail('Dispositivo inválido.');
@@ -204,10 +269,36 @@ async function dispatch(req:Request){
    if(!allowed.has(notice.admin_id+'|'+notice.client_id))continue;
    const stage=daysUntil(notice.due_date,today);
    if(stage===null)continue;
-   // Chave unica por aparelho + cobranca + data: execucoes simultaneas nao duplicam.
-   const {error:claim}=await db.from('clyriva_client_push_deliveries').insert({endpoint:sub.endpoint,notice_id:notice.id,delivery_date:today,days_before:stage});
-   if(claim){if(claim.code==='23505'){skipped++;continue;}throw claim;}
-   const payload=reminderText(notice,stage,sub.show_amount!==false,today);
+   // Exclusividade por dispositivo/cobranca/dia. Tentativas travadas sao recuperadas
+   // apos 15 minutos; envios confirmados nunca sao repetidos no mesmo dia.
+   const {error:claim}=await db.from('clyriva_client_push_deliveries')
+     .insert({endpoint:sub.endpoint,notice_id:notice.id,delivery_date:today,days_before:stage});
+   if(claim){
+    if(claim.code!=='23505')throw claim;
+    const expiry=new Date(Date.now()-15*60*1000).toISOString();
+    const {data:reclaimed,error:recoveryError}=await db.from('clyriva_client_push_deliveries')
+      .update({attempted_at:new Date().toISOString()})
+      .eq('endpoint',sub.endpoint).eq('notice_id',notice.id).eq('delivery_date',today)
+      .eq('state','pending').lt('attempted_at',expiry).select('notice_id').maybeSingle();
+    if(recoveryError)throw recoveryError;
+    if(!reclaimed){skipped++;continue;}
+   }
+   // Verificacao final: impedir um lembrete de cobranca paga durante a fila.
+   const {data:current,error:currentError}=await db.from('clyriva_client_notices')
+      .select('id,status,reminder_enabled,due_date,title,amount_cents,notice_type')
+      .eq('id',notice.id).eq('admin_id',notice.admin_id).eq('client_id',notice.client_id).maybeSingle();
+   if(currentError)throw currentError;
+   if(!current||current.status!=='active'||!current.reminder_enabled||daysUntil(current.due_date,today)!==stage){
+     await db.from('clyriva_client_push_deliveries').delete()
+       .eq('endpoint',sub.endpoint).eq('notice_id',notice.id).eq('delivery_date',today);
+     skipped++;continue;
+   }
+   // Revalidar o vínculo imediatamente antes do envio, incluindo revogações simultâneas.
+   if(!(await activeGrants(sub.user_id)).some(g=>g.admin_id===notice.admin_id&&g.client_id===notice.client_id)){
+     await db.from('clyriva_client_push_deliveries').delete().eq('endpoint',sub.endpoint).eq('notice_id',notice.id).eq('delivery_date',today);
+     skipped++;continue;
+   }
+   const payload=reminderText(current,stage,sub.show_amount===true,today);
    const ok=await push(sub,payload);
    if(ok){sent++;
     const {error:finish}=await db.from('clyriva_client_push_deliveries').update({state:'sent',sent_at:new Date().toISOString()})
