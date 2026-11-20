@@ -110,9 +110,149 @@ async function attachmentList(ids:string[]){
   .in('notice_id',ids).eq('state','ready').order('created_at',{ascending:false}).limit(500);
  if(e)throw e;return data||[];
 }
+// Arquivos da carteira privada (tarefas e guias) nunca são publicados ao cliente sem ação explícita.
+function internalEntity(payload:any,kind:any,raw:any){
+ const type=String(kind||''),entityId=String(raw||'');
+ if(!['task','tax'].includes(type)||entityId.length<6||entityId.length>120)return null;
+ const values=type==='task'?payload?.tasks:payload?.taxes;
+ if(!Array.isArray(values))return null;
+ const record=values.find((x:any)=>x?.id===entityId);
+ return record?.clientId&&activeCompany(payload,String(record.clientId))?{type,id:entityId,clientId:String(record.clientId)}:null;
+}
+async function internalDocuments(uid:string,action:string,body:any,payload:any){
+ const table='clyriva_internal_attachments';
+ if(action==='internal-unpublish'){
+  const kind=String(body?.entityType||''),entityId=String(body?.entityId||'');
+  if(!['task','tax'].includes(kind)||entityId.length<6||entityId.length>120)return fail('Registro inválido.');
+  // Antes de arquivar um aviso, a carteira confirmada deve deixar de conter o registro.
+  if(internalEntity(payload,kind,entityId))return fail('O registro ainda está ativo; exclua-o da carteira primeiro.',409);
+  const {error:e}=await db.from('clyriva_client_notices').update({status:'archived',updated_at:new Date().toISOString()}).eq('admin_id',uid).eq('source_type',kind).eq('source_id',entityId);
+  if(e)throw e;
+  // Anexos da carteira deixam de ser vinculados após a exclusão do registro.
+  const {data:old,error:oe}=await db.from(table).select('id,storage_path').eq('admin_id',uid).eq('entity_type',kind).eq('entity_id',entityId).limit(100);
+  if(oe)throw oe;
+  if(old?.length){await db.storage.from(DOC_BUCKET).remove(old.map(x=>x.storage_path));await db.from(table).delete().eq('admin_id',uid).in('id',old.map(x=>x.id));}
+  return response({ok:true});
+ }
+ if(action==='internal-publish'||action==='internal-sync'){
+  const owner=internalEntity(payload,body?.entityType,body?.entityId);
+  if(!owner)return fail('Salve primeiro o registro em uma empresa ativa.',404);
+  const source=(owner.type==='task'?payload.tasks:payload.taxes).find((x:any)=>x.id===owner.id);
+  if(!source)return fail('Registro inexistente.',404);
+  const isTax=owner.type==='tax';
+  const rawType=String(source.kind||'');
+  const kind=isTax?(CHARGE_TYPES.includes(rawType)?rawType:'Guia'):'Aviso';
+  const title=isTax?`${kind} · ${String(source.competence||'').slice(0,7)}${source.ref?' · '+String(source.ref).slice(0,35):''}`:String(source.title||'').slice(0,140);
+  const description=String(source.notes||'').trim().slice(0,1500)|| (isTax?'Cobrança cadastrada pela gestão. Consulte a guia e confira o vencimento.':'Pendência cadastrada pela gestão. Consulte os detalhes.');
+  const due=String(source.dueDate||'');
+  if(title.length<3||(!validISODate(due)&&due)||isTax&&(!validISODate(due)||parseBrlCents(source.value)===null))return fail('Dados do registro inválidos para publicar. Confira título, data e valor.',400);
+  const data:any={title,body:description,due_date:validISODate(due)?due:null,
+    status:isTax?(source.status==='paid'?'paid':'active'):(source.status==='done'?'archived':'active'),
+    notice_type:kind,reminder_enabled:isTax,amount_cents:isTax?parseBrlCents(source.value):null,
+    updated_at:new Date().toISOString()};
+  const {data:found,error:lookupError}=await db.from('clyriva_client_notices').select('id').eq('admin_id',uid).eq('source_type',owner.type).eq('source_id',owner.id).maybeSingle();
+  if(lookupError)throw lookupError;
+  if(action==='internal-sync'&&!found)return response({ok:true,skipped:true});
+  let noticeId=found?.id;
+  if(noticeId){const {error:updateError}=await db.from('clyriva_client_notices').update(data).eq('id',noticeId).eq('admin_id',uid);if(updateError)throw updateError;}
+  else{
+   const {data:inserted,error:createError}=await db.from('clyriva_client_notices').insert({admin_id:uid,client_id:owner.clientId,source_type:owner.type,source_id:owner.id,...data}).select('id').single();
+   if(createError?.code==='23505'){
+    const {data:prior,error:priorError}=await db.from('clyriva_client_notices').select('id').eq('admin_id',uid).eq('source_type',owner.type).eq('source_id',owner.id).maybeSingle();if(priorError||!prior)return fail('Já existe aviso; atualize a página e tente novamente.',409);noticeId=prior.id;
+   }else if(createError||!inserted)return fail('Não foi possível publicar.',500);
+   else noticeId=inserted.id;
+  }
+  // Sincronizar arquivos de registros já publicados, inclusive ao editar/salvar.
+  const {data:internal,error:docError}=await db.from(table).select('id,storage_path,original_name,mime_type,size_bytes').eq('admin_id',uid).eq('entity_type',owner.type).eq('entity_id',owner.id).eq('state','ready').limit(5);
+  if(docError)throw docError;
+  const {data:existing,error:attachmentsErr}=await db.from('clyriva_notice_attachments').select('id,source_attachment_id,storage_path').eq('notice_id',noticeId);
+  if(attachmentsErr)throw attachmentsErr;
+  const readyIds=new Set((internal||[]).map((item:any)=>item.id));
+  let removed=0,attachmentErrors=0;
+  // Um anexo interno removido não pode permanecer eternamente exposto no aplicativo.
+  // Preservar anexos enviados diretamente na tela de comunicados (sem source_attachment_id).
+  for(const old of existing||[]){
+   if(!old.source_attachment_id||readyIds.has(old.source_attachment_id))continue;
+   const {error:deleteFileError}=await db.storage.from(DOC_BUCKET).remove([old.storage_path]);
+   if(deleteFileError){attachmentErrors++;continue;}
+   const {error:deleteRowError}=await db.from('clyriva_notice_attachments').delete().eq('id',old.id).eq('notice_id',noticeId);
+   if(deleteRowError){attachmentErrors++;continue;}
+   removed++;
+  }
+  const copied=new Set((existing||[]).map((d:any)=>d.source_attachment_id).filter(Boolean));let attachmentsAdded=0;
+  for(const item of internal||[]){
+   if(copied.has(item.id))continue;
+   const {count}=await db.from('clyriva_notice_attachments').select('id',{count:'exact',head:true}).eq('notice_id',noticeId);
+   if((count||0)>=5)break;
+   const {data:blob,error:readErr}=await db.storage.from(DOC_BUCKET).download(item.storage_path);
+   if(readErr||!blob){attachmentErrors++;continue;}
+   const ext=item.mime_type==='application/pdf'?'pdf':item.mime_type==='image/png'?'png':'jpg';
+   const dest=`${uid}/${owner.clientId.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,50)}/${noticeId}/${crypto.randomUUID()}.${ext}`;
+   const {error:uploadErr}=await db.storage.from(DOC_BUCKET).upload(dest,blob,{contentType:item.mime_type,upsert:false});
+   if(uploadErr){attachmentErrors++;continue;}
+   const {error:insertErr}=await db.from('clyriva_notice_attachments').insert({admin_id:uid,client_id:owner.clientId,notice_id:noticeId,storage_path:dest,original_name:item.original_name,mime_type:item.mime_type,size_bytes:item.size_bytes,state:'ready',source_attachment_id:item.id});
+   if(insertErr){await db.storage.from(DOC_BUCKET).remove([dest]);attachmentErrors++;continue;}
+   attachmentsAdded++;
+  }
+  return response({ok:true,noticeId,created:!found,updated:!!found,attachmentsAdded,attachmentsRemoved:removed,attachmentErrors,reminders:isTax?[3,2,1,0]:[]});
+ }
+ if(action==='internal-list'){
+  const {data,error}=await db.from(table).select('id,entity_type,entity_id,client_id,original_name,size_bytes,mime_type,created_at').eq('admin_id',uid).eq('state','ready').order('created_at',{ascending:false}).limit(1500);
+  if(error)throw error;
+  return response({ok:true,attachments:(data||[]).filter((a:any)=>!!internalEntity(payload,a.entity_type,a.entity_id)&&internalEntity(payload,a.entity_type,a.entity_id)?.clientId===a.client_id)});
+ }
+ if(action==='internal-start'){
+  const owner=internalEntity(payload,body?.entityType,body?.entityId);
+  const name=cleanFilename(body?.fileName),mime=String(body?.mimeType||''),size=Number(body?.sizeBytes);
+  if(!owner)return fail('Salve primeiro a obrigação ou guia para anexar um arquivo.',404);
+  if(!name||!DOC_MIMES.has(mime)||!Number.isSafeInteger(size)||size<1||size>DOC_MAX)return fail('Use PDF, JPG ou PNG de até 5 MB.');
+  const {data:stale}=await db.from(table).select('id,storage_path').eq('admin_id',uid).eq('entity_type',owner.type).eq('entity_id',owner.id).eq('state','pending').lt('created_at',new Date(Date.now()-2*3600000).toISOString()).limit(20);
+  if(stale?.length){await db.storage.from(DOC_BUCKET).remove(stale.map(x=>x.storage_path));await db.from(table).delete().eq('admin_id',uid).in('id',stale.map(x=>x.id));}
+  const {count,error:cErr}=await db.from(table).select('id',{count:'exact',head:true}).eq('admin_id',uid).eq('entity_type',owner.type).eq('entity_id',owner.id);
+  if(cErr)throw cErr;if((count||0)>=5)return fail('Limite de cinco anexos por registro.',409);
+  const id=crypto.randomUUID(),ext=mime==='application/pdf'?'pdf':mime==='image/png'?'png':'jpg';
+  const path=`${uid}/interno/${owner.type}/${id}.${ext}`;
+  const {error:e}=await db.from(table).insert({id,admin_id:uid,client_id:owner.clientId,entity_type:owner.type,entity_id:owner.id,storage_path:path,original_name:name,mime_type:mime,size_bytes:size});
+  if(e)throw e;
+  const {data:upload,error:ue}=await db.storage.from(DOC_BUCKET).createSignedUploadUrl(path);
+  if(ue||!upload?.token){await db.from(table).delete().eq('id',id).eq('admin_id',uid);return fail('Não foi possível preparar o anexo.',503);}
+  return response({ok:true,attachmentId:id,path:upload.path,token:upload.token});
+ }
+ const id=attachmentId(body?.attachmentId);
+ if(!id)return fail('Selecione um documento válido.',400);
+ const {data:doc,error:e}=await db.from(table).select('*').eq('id',id).eq('admin_id',uid).maybeSingle();
+ if(e)throw e;if(!doc)return fail('Documento não encontrado.',404);
+ const owner=internalEntity(payload,doc.entity_type,doc.entity_id);
+ if(!owner||owner.clientId!==doc.client_id)return fail('O documento não pertence a uma empresa ativa.',403);
+ if(action==='internal-complete'){
+  if(doc.state==='ready')return response({ok:true});
+  const {data:blob,error:dErr}=await db.storage.from(DOC_BUCKET).download(doc.storage_path);
+  if(dErr||!blob)return fail('O upload ainda não terminou.',409);
+  const bytes=new Uint8Array(await blob.arrayBuffer());
+  if(bytes.length!==doc.size_bytes||!validFileHeader(bytes,doc.mime_type)){
+   await db.storage.from(DOC_BUCKET).remove([doc.storage_path]);await db.from(table).delete().eq('id',id).eq('admin_id',uid);
+   return fail('Arquivo inválido ou diferente do selecionado.',400);
+  }
+  const {error:uErr}=await db.from(table).update({state:'ready',updated_at:new Date().toISOString()}).eq('id',id).eq('admin_id',uid).eq('state','pending');
+  if(uErr)throw uErr;return response({ok:true});
+ }
+ if(action==='internal-link'){
+  if(doc.state!=='ready')return fail('O envio ainda não foi concluído.',409);
+  const {data:link,error:le}=await db.storage.from(DOC_BUCKET).createSignedUrl(doc.storage_path,60,body?.download===true?{download:doc.original_name}:undefined);
+  if(le||!link?.signedUrl)return fail('Documento indisponível.',503);
+  return response({ok:true,url:link.signedUrl,expiresIn:60});
+ }
+ if(action==='internal-remove'){
+  const {error:de}=await db.storage.from(DOC_BUCKET).remove([doc.storage_path]);if(de)return fail('Falha ao remover arquivo.',503);
+  const {error:re}=await db.from(table).delete().eq('id',id).eq('admin_id',uid);if(re)throw re;
+  return response({ok:true});
+ }
+ return fail('Operação de documentos inválida.',404);
+}
 async function adminHandler(uid:string,action:string,body:any){
  const payload=await workspace(uid),customers=Array.isArray(payload?.clients)?payload.clients:[];
  const clientId=String(body?.clientId||'').trim();
+ if(action.startsWith('internal-'))return await internalDocuments(uid,action,body,payload);
  if(action==='attachment-link')return await attachmentLink(uid,body,true);
  if(action==='attachment-start'){
   const noticeId=attachmentId(body?.noticeId),name=cleanFilename(body?.fileName),mime=String(body?.mimeType||''),size=Number(body?.sizeBytes);
