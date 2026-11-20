@@ -86,7 +86,9 @@ def main():
     w = {"version":1, "clients":[{"id":a,"name":"Aurora MEI","status":"active"},{"id":b,"name":"Brisa MEI","status":"active"}],
          "taxes":[{"id":tax,"clientId":a,"kind":"DAS","competence":"2026-11","dueDate":"2026-11-25","value":92.75,"status":"open"}],
          "tasks":[{"id":task,"clientId":b,"title":"Enviar extrato","category":"Documental","status":"pending","notes":"INTERNO TESTE","dueDate":"2026-11-25"}],
-         "cash":[],"fees":[],"invoices":[]}
+         "cash":[{"id":"recebimento-01","clientId":b,"kind":"receipt","date":"2026-11-18","value":140,"invoiceId":"nota-brisa"}],
+         "fees":[{"id":"honorario-01","clientId":b,"competence":"2026-11","expected":200,"paid":150}],
+         "invoices":[{"id":"nota-brisa","clientId":b,"competence":"2026-11","number":"001","status":"issued","value":500}]}
     rev = 0
     def save():
         nonlocal rev
@@ -125,12 +127,20 @@ def main():
     op("client-attachment-link",alice,{"attachmentId":public_file},(404,))
     w["taxes"][0].update(status="paid",paidAt="2026-11-20"); save()
     assert op("client-list",alice)["notices"][0]["status"]=="paid"
+    conflict=rpc("clyriva_commit",admin,{"p_expected":rev-1,"p_workspace":w,"p_vault":None},(400,409,500))
+    assert conflict["code"]=="40001" and rpc("clyriva_load",admin)["revision"]==rev
     w["taxes"][0].update(status="open",paidAt="",value=95); save()
     bill=op("client-list",alice)["notices"][0]
     assert bill["status"]=="active" and bill["amount_cents"]==9500
     tp={"entityType":"task","entityId":task}
     upload(admin,tp,"pendencia.pdf"); publish(tp)
-    assert "INTERNO TESTE" not in json.dumps(op("client-list",bob))
+    brisa=op("client-list",bob)
+    assert "INTERNO TESTE" not in json.dumps(brisa)
+    task_notice=brisa["notices"][0]["id"]
+    op("admin-archive",admin,{"noticeId":task_notice})
+    w["tasks"][0]["title"]="Conferir extrato alterado"; save()
+    op("admin-internal-sync",admin,tp)
+    assert not op("client-list",bob)["notices"]
     # Exportação da carteira e recuperação de uma revisão são operações distintas dos objetos do Storage.
     backup=json.loads(json.dumps(rpc("clyriva_load",admin)["data"]))
     old_rev=rev

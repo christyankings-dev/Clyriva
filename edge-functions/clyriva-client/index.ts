@@ -261,7 +261,8 @@ async function internalDocuments(uid:string,action:string,body:any,payload:any){
    const {data:inserted,error:createError}=await db.from('clyriva_client_notices').insert({admin_id:uid,client_id:owner.clientId,source_type:owner.type,source_id:owner.id,...data}).select('id').single();
    if(createError?.code==='23505'){
     const {data:prior,error:priorError}=await db.from('clyriva_client_notices').select('id,client_id').eq('admin_id',uid).eq('source_type',owner.type).eq('source_id',owner.id).maybeSingle();if(priorError||!prior||prior.client_id!==owner.clientId)return fail('Já existe aviso; atualize a página e tente novamente.',409);noticeId=prior.id;
-   }else if(createError||!inserted)return fail('Não foi possível publicar.',500);
+   }else if(createError?.code==='40001')return fail('O lançamento mudou. Confira a publicação novamente.',409);
+   else if(createError||!inserted)return fail('Não foi possível publicar.',500);
    else noticeId=inserted.id;
   }
   if(action==='internal-sync')return response({ok:true,noticeId,status:data.status,updated:true});

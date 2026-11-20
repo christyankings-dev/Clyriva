@@ -149,7 +149,7 @@
         function action(label, verb, id) {
           const act = button(label,'routine-link');
           act.setAttribute('aria-label', label+' — '+item.title+' — '+item.company);
-          act.onclick = () => onAction(verb,id);
+          act.onclick = () => onAction(verb,id,item.competence);
           acts.append(act);
         }
         action('Abrir ficha','view-client',item.clientId);

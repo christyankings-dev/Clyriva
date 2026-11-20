@@ -10,7 +10,7 @@ O Clyriva reúne a carteira, os honorários, as notas fiscais de controle, o cai
 
 ## Rotina do escritório
 
-Em **Visão geral → Meu dia / Minha semana**, selecione um contador para listar os registros. Os prazos usam o calendário de Brasília em todas as competências. O filtro de empresa se aplica à agenda. Em cada linha é possível abrir a ficha, registrar pagamento ou concluir a tarefa. A tarefa pode ser marcada como **Aguardando retorno do cliente** na edição.
+Em **Visão geral → Meu dia / Minha semana**, selecione um contador para listar os registros. Os prazos usam o calendário de Brasília em todas as competências. O filtro de empresa se aplica à agenda das empresas ativas. Abrir a ficha por uma linha seleciona a competência daquele lançamento. Em cada linha é possível abrir a ficha, registrar pagamento ou concluir a tarefa. A tarefa pode ser marcada como **Aguardando retorno do cliente** na edição.
 
 Em **Meus clientes → Ficha → Cadastrar guia** ou **Criar tarefa**, é possível selecionar o PDF, JPG ou PNG antes de salvar. O registro é gravado primeiro. Se o documento falhar, use **Tentar novamente**. Para o cliente baixar os arquivos, use **Disponibilizar no app do cliente** e confira empresa, vencimento, valor, documentos e acessos. Esse passo se aplica também a novos anexos de uma guia já publicada.
 

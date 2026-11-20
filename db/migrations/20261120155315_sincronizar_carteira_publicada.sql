@@ -94,3 +94,34 @@ $$;
 revoke all on function clyriva_private.sync_published_workspace() from public,anon,authenticated;
 create or replace trigger clyriva_sync_published_workspace after update of payload on public.clyriva_workspace
 for each row when (old.payload is distinct from new.payload) execute function clyriva_private.sync_published_workspace();
+
+-- A criação do primeiro aviso também precisa observar a origem se coincidir com uma edição/exclusão.
+create or replace function clyriva_private.guard_new_linked_notice()
+returns trigger language plpgsql security definer set search_path = ''
+as $$
+declare
+  portfolio jsonb;
+  source_row jsonb;
+begin
+  perform 1 from public.clyriva_admins where user_id=new.admin_id for key share;
+  select w.payload into portfolio from public.clyriva_workspace w where w.admin_id=new.admin_id for share;
+  if not exists (select 1 from jsonb_array_elements(portfolio->'clients') c
+                 where c->>'id'=new.client_id and c->>'status' is distinct from 'inactive') then
+    raise exception 'Empresa indisponível para publicação' using errcode='40001';
+  end if;
+  select r into source_row from jsonb_array_elements(
+    portfolio->(case new.source_type when 'tax' then 'taxes' when 'task' then 'tasks' end)
+  ) r where r->>'id'=new.source_id and r->>'clientId'=new.client_id;
+  if source_row is null or new.due_date is distinct from nullif(source_row->>'dueDate','')::date
+     or (new.source_type='tax' and (new.amount_cents is distinct from (nullif(source_row->>'value','')::numeric*100)
+         or new.status is distinct from case when source_row->>'status'='paid' then 'paid' else 'active' end))
+     or (new.source_type='task' and (new.title is distinct from left(source_row->>'title',140)
+         or new.status is distinct from case when source_row->>'status'='done' then 'archived' else 'active' end)) then
+    raise exception 'O lançamento mudou durante a publicação' using errcode='40001';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function clyriva_private.guard_new_linked_notice() from public,anon,authenticated;
+create or replace trigger clyriva_guard_new_linked_notice before insert on public.clyriva_client_notices
+for each row when (new.source_type is not null) execute function clyriva_private.guard_new_linked_notice();

@@ -101,6 +101,7 @@ def suite(browser, width):
     expect(agenda.locator(".routine-date")).to_contain_text("10/2026")
     agenda.get_by_role("button",name="Abrir ficha",exact=False).click()
     expect(frame.locator("h1")).to_have_text("Aurora")
+    expect(frame.locator("#month")).to_have_value("2026-10")
     frame.locator("[data-action='new-tax-for']").click()
     expect(frame.locator("#f-clientId")).to_have_value("aurora-01")
     frame.locator("[data-action='close-modal']").first.click()

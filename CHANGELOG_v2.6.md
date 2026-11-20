@@ -15,7 +15,7 @@ O ponto de partida foi a v2.5 em `main`, commit `d398610`, com CI concluída e o
 
 ## Agenda da carteira
 
-A agenda **Meu dia / Minha semana** usa vencimento em Brasília, atravessa a virada do mês e respeita a empresa selecionada. As listas de pendências aguardando cliente, guias sem anexo, guias com envio pendente, publicadas e arquivadas reutilizam as guias e tarefas originais. O resumo do servidor entrega estados e quantidades paginados com escopo administrativo. A tela mostra a indisponibilidade da consulta sem substituir dados desconhecidos por zero.
+A agenda **Meu dia / Minha semana** usa vencimento em Brasília, atravessa a virada do mês e respeita a empresa selecionada. As listas de pendências aguardando cliente, guias sem anexo, guias com envio pendente, publicadas e arquivadas reutilizam as guias e tarefas originais. O atalho para a ficha seleciona a competência do registro. O resumo do servidor entrega estados e quantidades paginados com escopo administrativo. A tela mostra a indisponibilidade da consulta sem substituir dados desconhecidos por zero.
 
 Os períodos de três e sete dias começam amanhã. Hoje e atrasados têm controles próprios. Uma guia publicada com um novo anexo interno pode aparecer simultaneamente em **Guias publicadas** e **Guias com envio pendente**. Competência, vencimento, valor, ficha, documentos e ação de baixa ou conclusão ficam na linha do registro.
 
