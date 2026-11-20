@@ -1,5 +1,4 @@
 """Ciclo com Supabase Auth, Postgres, Storage e Edge locais. Usa apenas identidades sintéticas."""
-import copy
 import json
 import os
 import secrets
@@ -62,8 +61,8 @@ def upload(token, source, filename, contents=PDF):
     return ticket["attachmentId"]
 
 
-def download(token, ident):
-    signed = op("client-attachment-link", token, {"attachmentId":ident,"download":True})
+def download(token, ident, action="client-attachment-link"):
+    signed = op(action, token, {"attachmentId":ident,"download":True})
     assert signed["expiresIn"] == 60
     url = urlsplit(signed["url"])
     assert url.path.startswith("/storage/v1/object/sign/")
@@ -141,6 +140,11 @@ def main():
     assert rpc("clyriva_load",admin)["data"]==backup
     op("client-list",alice,expected=(403,))
     assert any(f["id"]==file2 for f in op("admin-internal-list",admin,params)["attachments"])
+    restored_bytes=download(admin,file2,"admin-internal-link")
+    assert restored_bytes==PDF
+    op("admin-internal-remove",admin,{"attachmentId":file2})
+    restored_id=upload(admin,params,"revisao.pdf",restored_bytes)
+    assert download(admin,restored_id,"admin-internal-link")==restored_bytes
     op("admin-revoke",admin,{"clientId":b,"email":b_mail})
     op("client-list",bob,expected=(403,))
     print("OK: Auth de 3 contas, RPC, 2 empresas, arquivos reais, privacidade, repetição, baixa, revogação e restauração.")

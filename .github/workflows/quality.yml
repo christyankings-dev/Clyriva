@@ -24,6 +24,7 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Syntax checks
         run: |
+          node --check rotina.js
           node --check core.js
           node --check panel.js
           node --check avisos-admin.js
@@ -42,6 +43,7 @@ jobs:
         run: |
           node tests/core_private_test.js
           node tests/reminder_rules_test.mjs
+          node tests/edge_integration_v22.mjs
       - name: Install headless browser dependencies
         run: |
           python -m pip install "playwright==1.56.0"
@@ -52,6 +54,7 @@ jobs:
           python tests/browser_billing_test.py
           python tests/browser_v22_test.py
           python tests/browser_documents_v23.py
+          python tests/browser_agenda_v26.py
 
   supabase-local:
     runs-on: ubuntu-latest
