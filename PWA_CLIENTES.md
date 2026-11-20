@@ -40,3 +40,11 @@ O Clyriva da **gestão** conserva o painel contábil completo e a carteira exclu
 - Páginas: `/cliente.html` e `/avisos-admin.html`.
 - Testes adicionais: `tests/cliente_test.py` e testes de permissões/anônimos executados no Supabase.
 - **Pendente:** teste de ponta a ponta com uma conta de cliente e um aparelho físico autorizando as notificações. Não declare entrega de push para celular como verificada antes desse teste.
+
+## v2.1 - cobrancas com lembretes D-3 / D-2 / D-1 / D0
+
+Em **Avisos para clientes → Cadastrar cobrança**, selecione empresa, tipo (DAS, Boleto, DARF, FGTS, INSS, Guia, Outro), descricao, valor em reais e vencimento. O vencimento informado e o valor sao apresentados na ficha do cliente. A verificacao diaria ocorre às 09h America/Sao_Paulo via cron 12:00 UTC. Sao produzidas quatro notificacoes independentes por cobranca/assinatura: faltando 3 dias, 2 dias, 1 dia e no vencimento, sempre conforme o fuso brasileiro; o cron deve funcionar e o celular permitir Web Push. Nao ha garantia de hora exata de exibicao pelo sistema operacional. O usuario escolhe se o valor aparece na notificacao, o que pode inclui-lo na tela bloqueada. O sistema nao envia PDFs, codigos de barras nem gera guias de pagamento.
+
+Cada disparo e registrado pela combinacao **endpoint + cobranca + dia do envio**, para evitar duplicidade em execucoes simultaneas ou repetidas. A administracao pode editar cobrancas ativas, marca-las como pagas (interrompendo lembretes futuros) ou arquiva-las. Mensagens avulsas continuam com envio imediato opcional, mas **nao** geram quatro lembretes diarios.
+
+O aplicativo fica associado exclusivamente a cada login de cliente e suas empresas autorizadas. Requer autorizacao explicita do cliente para receber notificacoes. Para verificar a entrega real, cadastra-se uma cobranca ficticia com vencimento em ate tres dias em uma empresa com cliente autenticado e aparelho inscrito e aguarda-se o cron ou um disparo manual autorizado. O servidor e o gateway podem aceitar uma notificacao sem que o telefone a apresente (sem conexao, bateria, bloqueio, permissao etc.).

@@ -15,15 +15,22 @@ async function api(action,data={}){
  let result={};try{result=await r.json();}catch{}
  if(!r.ok||!result.ok)throw Error(result.error||'Serviço temporariamente indisponível.');return result;
 }
+function money(cents){return 'R$ '+(Number(cents)/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function daysRemaining(iso){if(!iso)return null;const d=Date.UTC(...iso.split('-').map((v,i)=>i===1?Number(v)-1:Number(v)));const now=new Intl.DateTimeFormat('en-US',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()),get=k=>Number(now.find(v=>v.type===k)?.value||0),today=Date.UTC(get('year'),get('month')-1,get('day'));return Math.round((d-today)/86400000);}
 function noticeCard(n,company){
  const card=document.createElement('article');card.className='notice-card';
  const head=document.createElement('div');head.className='between';
- const title=document.createElement('h3');title.textContent=n.title;head.append(title);
- if(n.due_date){const tag=document.createElement('span');tag.className='pill';tag.textContent='Prazo: '+safeDate(n.due_date);head.append(tag);}
+ const title=document.createElement('h3');title.textContent=(n.reminder_enabled?(n.notice_type+' · '):'')+n.title;head.append(title);
+ const paid=n.status==='paid',remaining=daysRemaining(n.due_date);
+ const tag=document.createElement('span');tag.className='pill';tag.textContent=paid?'Pago':n.due_date?remaining===0?'Vence hoje':remaining===1?'Vence amanhã':remaining>1?'Faltam '+remaining+' dias':'Prazo vencido':'Comunicado';head.append(tag);
  const msg=document.createElement('p');msg.textContent=n.body;
- const meta=document.createElement('div');meta.className='meta';meta.textContent=company+' · Publicado em '+new Date(n.created_at).toLocaleDateString('pt-BR');
- card.append(head,msg,meta);return card;
+ card.append(head);
+ if(n.reminder_enabled&&n.amount_cents!=null){const moneyTag=document.createElement('strong');moneyTag.className='bill-amount';moneyTag.textContent=money(n.amount_cents);card.append(moneyTag);}
+ card.append(msg);
+ const meta=document.createElement('div');meta.className='meta';meta.textContent=company+(n.due_date?' · Vencimento: '+safeDate(n.due_date):'')+' · Publicado em '+new Date(n.created_at).toLocaleDateString('pt-BR');
+ card.append(meta);return card;
 }
+
 async function refresh(){
  const data=await api('client-list');const area=$('#client-notices');area.replaceChildren();
  const byClient=new Map((data.companies||[]).map(c=>[c.admin_id+'|'+c.client_id,c.company]));
@@ -51,7 +58,7 @@ async function enable(){const b=$('#client-push-enable');b.disabled=true;
   const worker=await ready();
   const k=await fetch(config.supabaseUrl+'/functions/v1/clyriva-push/public-key').then(async x=>{if(!x.ok)throw Error('Chave de notificações indisponível.');return x.json();});
   let sub=await worker.pushManager.getSubscription();if(!sub)sub=await worker.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:decodeBase64(k.publicKey)});
-  await api('client-subscribe',{subscription:sub.toJSON()});status('#push-feedback','Notificações ativadas para sua conta neste aparelho.');
+  await api('client-subscribe',{subscription:sub.toJSON(),showAmount:$('#client-show-amount').checked});status('#push-feedback','Notificações ativadas para sua conta neste aparelho.');
  }catch(e){status('#push-feedback',e.message||'Falha na ativação.',true);}finally{b.disabled=false;}
 }
 async function test(){const b=$('#client-push-test');b.disabled=true;try{const worker=await ready(),sub=await worker.pushManager.getSubscription();if(!sub)throw Error('Ative as notificações primeiro.');await api('client-test',{endpoint:sub.endpoint});status('#push-feedback','Teste enviado. Verifique os avisos do celular.');}catch(e){status('#push-feedback',e.message,true);}finally{b.disabled=false;}}

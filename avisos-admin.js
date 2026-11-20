@@ -7,6 +7,12 @@ let state={companies:[],grants:[],notices:[]},busy=false;
 const status=(sel,msg,err=false)=>{const el=$(sel);if(el){el.textContent=msg;el.classList.toggle('error',err);}};
 function el(tag,text,className){const node=document.createElement(tag);if(text!=null)node.textContent=String(text);if(className)node.className=className;return node;}
 function fmtDate(v){return v?String(v).slice(8,10)+'/'+String(v).slice(5,7)+'/'+String(v).slice(0,4):'Sem prazo';}
+function fmtMoney(cents){return 'R$ '+(Number(cents)/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function moneyForInput(cents){return (Number(cents)/100).toFixed(2);}
+function resetChargeForm(){const f=$('#charge-form');f.reset();delete f.dataset.editId;f.elements.clientId.disabled=false;$('#charge-heading').textContent='Cadastrar cobrança com lembretes';$('#charge-submit').textContent='Cadastrar cobrança e programar lembretes';$('#charge-cancel-edit').classList.add('hidden');status('#charge-feedback','');chargePreview();}
+function editCharge(n){const f=$('#charge-form');f.elements.clientId.value=n.client_id;f.elements.clientId.disabled=true;f.elements.noticeType.value=n.notice_type;f.elements.title.value=n.title;f.elements.amount.value=moneyForInput(n.amount_cents);f.elements.dueDate.value=n.due_date;f.elements.message.value=n.body==='Cobrança cadastrada pela sua gestão. Consulte os detalhes antes de pagar.'?'':n.body;f.dataset.editId=n.id;$('#charge-heading').textContent='Editar cobrança';$('#charge-submit').textContent='Salvar alterações';$('#charge-cancel-edit').classList.remove('hidden');chargePreview();$('#charge-section').scrollIntoView({behavior:'smooth',block:'start'});f.elements.title.focus();}
+function chargePreview(){const f=$('#charge-form'),type=f.elements.noticeType.value||'Cobrança',date=f.elements.dueDate.value,amount=Number(f.elements.amount.value||0);const t=Number.isFinite(amount)&&amount>0?(' · '+amount.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})):'';$('#charge-preview').textContent=date?'Avisos automáticos: '+[3,2,1,0].map(d=>{const p=new Date(date+'T12:00:00Z');p.setUTCDate(p.getUTCDate()-d);return p.toLocaleDateString('pt-BR',{timeZone:'UTC'})+' — '+type+' '+(d===0?'vence hoje':d===1?'vence amanhã':`vence em ${d} dias`)+t;}).join(' | '):'Preencha o valor e o vencimento para visualizar os quatro lembretes automáticos.';}
+
 async function api(action,data={}){
  const {data:{session},error}=await client.auth.getSession();if(error||!session?.access_token)throw Error('Entre pelo painel administrativo antes de continuar.');
  const res=await fetch(base+'/admin-'+action,{method:'POST',headers:{'Content-Type':'application/json','apikey':cfg.supabaseAnonKey,'Authorization':'Bearer '+session.access_token},body:JSON.stringify(data),cache:'no-store'});
@@ -31,12 +37,38 @@ function render(){
  }
  const notices=$('#notices-list');notices.replaceChildren();
  if(!state.notices.length)notices.append(el('div','Nenhum aviso publicado ainda.','empty'));
- for(const n of state.notices){const card=el('article',null,'notice-card');const top=el('div',null,'between');top.append(el('strong',n.title),el('span',n.status==='active'?'Publicado':'Arquivado',n.status==='active'?'pill':'meta'));
-  card.append(top,el('p',n.body));card.append(el('div',company(n.client_id)+' · '+fmtDate(n.due_date),'meta'));
-  if(n.status==='active'){const b=el('button','Arquivar aviso','btn');b.type='button';b.style.marginTop='12px';b.addEventListener('click',async()=>{if(!confirm('Arquivar este aviso? Ele deixará de aparecer para o cliente.'))return;b.disabled=true;try{await api('archive',{noticeId:n.id});await refresh();}catch(e){status('#admin-feedback',e.message,true);}finally{b.disabled=false;}});card.append(b);}notices.append(card);
+ for(const n of state.notices){
+  const bill=!!n.reminder_enabled;
+  const card=el('article',null,'notice-card'),top=el('div',null,'between');
+  const label=n.status==='paid'?'Pago':n.status==='archived'?'Arquivado':bill?'A vencer':'Publicado';
+  top.append(el('strong',(bill?(n.notice_type+' · '):'')+n.title),el('span',label,n.status==='paid'?'pill':'meta'));
+  card.append(top,el('p',n.body));
+  card.append(el('div',company(n.client_id)+' · Vencimento: '+fmtDate(n.due_date)+(bill?' · '+fmtMoney(n.amount_cents):''),'meta'));
+  if(bill&&n.status==='active'){
+   const edit=el('button','Editar cobrança','btn');edit.type='button';edit.addEventListener('click',()=>editCharge(n));card.append(edit);
+   const paid=el('button','Marcar como pago','btn');paid.type='button';paid.style.margin='8px';paid.addEventListener('click',async()=>{
+     if(!confirm('Confirmar o pagamento? Os lembretes futuros desta cobrança serão interrompidos.'))return;
+     paid.disabled=true;try{await api('mark-paid',{noticeId:n.id});status('#admin-feedback','Cobrança marcada como paga. Lembretes futuros suspensos.');await refresh();}catch(e){status('#admin-feedback',e.message,true);}finally{paid.disabled=false;}
+   });card.append(paid);
+  }
+  if(n.status!=='archived'){
+   const archive=el('button','Arquivar','btn');archive.type='button';archive.style.marginTop='8px';archive.addEventListener('click',async()=>{
+     if(!confirm('Arquivar este registro? Ele deixará de aparecer para o cliente e não enviará mais lembretes.'))return;
+     archive.disabled=true;try{await api('archive',{noticeId:n.id});await refresh();}catch(e){status('#admin-feedback',e.message,true);}finally{archive.disabled=false;}
+   });card.append(archive);
+  }
+  notices.append(card);
  }
+
 }
 async function refresh(){const res=await api('list');state={companies:res.companies||[],grants:res.grants||[],notices:res.notices||[]};render();$('#admin-loading').classList.add('hidden');$('#admin-workspace').classList.remove('hidden');if(!state.companies.length)status('#admin-feedback','Cadastre e salve sua primeira empresa no painel antes de publicar avisos.');}
+async function createCharge(e){e.preventDefault();if(busy)return;busy=true;const f=e.target,b=$('#charge-submit');b.disabled=true;
+ try{const payload=Object.fromEntries(new FormData(f));payload.clientId=f.elements.clientId.value;
+  const isEdit=!!f.dataset.editId;if(isEdit)payload.noticeId=f.dataset.editId;
+  await api(isEdit?'update-charge':'create-charge',payload);
+  resetChargeForm();await refresh();status('#charge-feedback',isEdit?'Cobrança atualizada. Próximos lembretes usarão os dados corrigidos.':'Cobrança cadastrada. Serão enviados avisos no D-3, D-2, D-1 e vencimento, conforme o prazo.');
+ }catch(err){status('#charge-feedback',err.message,true);}finally{busy=false;b.disabled=false;}
+}
 async function invite(e){e.preventDefault();if(busy)return;busy=true;const form=e.target,b=form.querySelector('button[type="submit"]');b.disabled=true;status('#invite-result','Criando acesso…');
  try{
   const data=Object.fromEntries(new FormData(form));const value=await api('invite',data);
@@ -53,6 +85,9 @@ async function publish(e){e.preventDefault();if(busy)return;busy=true;const form
 }
 async function init(){
  $('#invite-form').addEventListener('submit',invite);$('#notice-form').addEventListener('submit',publish);
+ $('#charge-form').addEventListener('submit',createCharge);$('#charge-cancel-edit').addEventListener('click',resetChargeForm);
+ for(const e of $('#charge-form').querySelectorAll('input,select,textarea'))e.addEventListener('input',chargePreview);
+ chargePreview();
  $('#copy-client-link').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(location.origin+'/cliente.html');status('#admin-feedback','Link copiado.');}catch{status('#admin-feedback','Não foi possível copiar automaticamente. Link: '+location.origin+'/cliente.html',true);}});
  try{const {data:{user},error}=await client.auth.getUser();if(error||!user)throw Error('Entre pelo painel administrativo primeiro.');
   const {data,error:e}=await client.from('clyriva_admins').select('user_id').eq('user_id',user.id).maybeSingle();if(e||!data)throw Error('Esta página é exclusiva da gestão.');await refresh();
