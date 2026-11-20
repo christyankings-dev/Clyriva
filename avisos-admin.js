@@ -114,14 +114,15 @@ function render(){
  }).sort((a,b)=>a.status==='active'&&b.status!=='active'?-1:a.status!=='active'&&b.status==='active'?1:String(a.due_date||'9999').localeCompare(String(b.due_date||'9999')));
  if(!filtered.length)notices.append(el('div','Nenhum aviso publicado ainda.','empty'));
  for(const n of filtered){
-  const bill=!!n.reminder_enabled;
+  const bill=!!n.reminder_enabled,linked=Boolean(n.source_type&&n.source_id);
   const card=el('article',null,'notice-card'),top=el('div',null,'between');
   const label=n.status==='paid'?'Pago':n.status==='archived'?'Arquivado':bill?'A vencer':'Publicado';
   top.append(el('strong',(bill?(n.notice_type+' · '):'')+n.title),el('span',label,n.status==='paid'?'pill':'meta'));
   card.append(top,el('p',n.body));
+   if(linked)card.append(el('div','Vinculada à ficha do cliente: altere valor, vencimento e pagamento na guia original, no painel principal. Aqui você pode consultar documentos e arquivar a publicação.','meta'));
   card.append(el('div',company(n.client_id)+' · Vencimento: '+fmtDate(n.due_date)+(bill?' · '+fmtMoney(n.amount_cents):''),'meta'));
   if(bill){card.append(el('div',n.last_delivery?('Último lembrete aceito pelo serviço: '+fmtDate(n.last_delivery.date)+' (D-'+n.last_delivery.daysBefore+').'):('Lembretes ainda não enviados para dispositivo inscrito.'),'meta'));}
-  if(bill&&n.status==='paid'){
+  if(bill&&n.status==='paid'&&!linked){
    const reopen=el('button','Reabrir cobrança','btn');reopen.type='button';reopen.addEventListener('click',async()=>{
     if(!confirm('Reabrir esta cobrança? Ela voltará a enviar lembretes nos dias devidos.'))return;
     reopen.disabled=true;try{await api('reopen-charge',{noticeId:n.id});status('#admin-feedback','Cobrança reaberta. Lembretes futuros retomados.');await refresh();}catch(e){status('#admin-feedback',e.message,true);}finally{reopen.disabled=false;}
@@ -133,11 +134,12 @@ function render(){
     const txt='Olá! Lembrete de '+n.notice_type+': '+n.title+'\nValor: '+fmtMoney(n.amount_cents)+'\nVencimento: '+fmtDate(n.due_date)+'\n'+(n.body||'Confira a guia e os dados de pagamento.');
     try{await navigator.clipboard.writeText(txt);status('#admin-feedback','Lembrete copiado para enviar ao cliente.');}catch{status('#admin-feedback','Não foi possível copiar automaticamente.',true);}
    });card.append(copyBill);
+   if(!linked){
    const edit=el('button','Editar cobrança','btn');edit.type='button';edit.addEventListener('click',()=>editCharge(n));card.append(edit);
    const paid=el('button','Marcar como pago','btn');paid.type='button';paid.style.margin='8px';paid.addEventListener('click',async()=>{
      if(!confirm('Confirmar o pagamento? Os lembretes futuros desta cobrança serão interrompidos.'))return;
      paid.disabled=true;try{await api('mark-paid',{noticeId:n.id});status('#admin-feedback','Cobrança marcada como paga. Lembretes futuros suspensos.');await refresh();}catch(e){status('#admin-feedback',e.message,true);}finally{paid.disabled=false;}
-   });card.append(paid);
+   });card.append(paid);}
   }
   if(n.status!=='archived'){
    const archive=el('button','Arquivar','btn');archive.type='button';archive.style.marginTop='8px';archive.addEventListener('click',async()=>{

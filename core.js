@@ -21,6 +21,17 @@
     }
     return true;
   }
+  function validCpf(value) {
+    const c=doc(value);
+    if(!/^\d{11}$/.test(c)||/^(.)\1{10}$/.test(c))return false;
+    const digits=[...c].map(Number);
+    for(const size of [9,10]){
+      const total=digits.slice(0,size).reduce((sum,digit,i)=>sum+digit*(size+1-i),0);
+      const check=(total*10)%11;
+      if(digits[size]!== (check===10?0:check))return false;
+    }
+    return true;
+  }
   const validDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) &&
     !Number.isNaN(Date.parse(v+'T00:00:00Z')) && new Date(v+'T00:00:00Z').toISOString().slice(0,10) === v;
   const validMonth = v => typeof v === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(v);
@@ -89,5 +100,5 @@
       !encoded(blob.iv,12,12) || !encoded(blob.cipher,16,16*1024*1024)) throw Error('Estrutura do cofre criptografado inválida. O original foi preservado.');
     return blob;
   }
-  window.ClyrivaCore = Object.freeze({empty, cents, brl, sum, doc, isCnpj, validCnpj, validDate, validMonth, dateLabel, monthLabel, workspace, checkLinks, vault});
+  window.ClyrivaCore = Object.freeze({empty, cents, brl, sum, doc, isCnpj, validCnpj, validCpf, validDate, validMonth, dateLabel, monthLabel, workspace, checkLinks, vault});
 })();

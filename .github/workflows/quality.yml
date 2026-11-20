@@ -1,0 +1,54 @@
+name: Clyriva - quality checks
+
+on:
+  pull_request:
+  push:
+    branches: [main, "fix/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Syntax checks
+        run: |
+          node --check core.js
+          node --check panel.js
+          node --check avisos-admin.js
+          node --check cliente.js
+          node --experimental-strip-types --check edge-functions/clyriva-client/index.ts
+          python -m compileall -q servidor.py tests/
+      - name: Python unit and static regression checks (no real customer data)
+        run: |
+          for name in \
+            attachments_v23_test.py audit_v22_test.py charge_reminders_test.py \
+            cliente_test.py integrated_docs_v24_test.py integrity_v25_test.py \
+            private_server_test.py pwa_test.py servidor_test.py; do
+            python -m unittest discover -s tests -p "$name" -v
+          done
+      - name: JavaScript unit tests
+        run: |
+          node tests/core_private_test.js
+          node tests/reminder_rules_test.mjs
+      - name: Install headless browser dependencies
+        run: |
+          python -m pip install "playwright==1.56.0"
+          sudo apt-get update -qq
+          sudo apt-get install -y chromium
+      - name: Isolated desktop and mobile UI regression
+        run: |
+          python tests/browser_billing_test.py
+          python tests/browser_v22_test.py
+          python tests/browser_documents_v23.py
