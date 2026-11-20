@@ -157,7 +157,7 @@ async function internalDocuments(uid:string,action:string,body:any,payload:any){
   if(action==='internal-sync'&&!found)return response({ok:true,skipped:true});
   // Respeita a opção de arquivar no app: edições administrativas não republicam
   // automaticamente comunicados que foram ocultados do cliente.
-  if(action==='internal-sync'&&found?.status==='archived'&&data.status==='active')data.status='archived';
+  if(action==='internal-sync'&&found?.status==='archived')data.status='archived';
   if(action==='internal-sync'&&found)delete data.body; // Preserva a mensagem editada na área de avisos.
   let noticeId=found?.id;
   if(noticeId){const {error:updateError}=await db.from('clyriva_client_notices').update(data).eq('id',noticeId).eq('admin_id',uid);if(updateError)throw updateError;}
@@ -203,9 +203,18 @@ async function internalDocuments(uid:string,action:string,body:any,payload:any){
   return response({ok:true,noticeId,created:!found,updated:!!found,attachmentsAdded,attachmentsRemoved:removed,attachmentErrors,reminders:isTax?[3,2,1,0]:[]});
  }
  if(action==='internal-list'){
-  const {data,error}=await db.from(table).select('id,entity_type,entity_id,client_id,original_name,size_bytes,mime_type,created_at').eq('admin_id',uid).eq('state','ready').order('created_at',{ascending:false}).limit(1500);
+  // Ao abrir um registro, carregar só seus anexos, com checagem da empresa no servidor.
+  const scoped=body?.entityType!==undefined||body?.entityId!==undefined;
+  const owner=scoped?internalEntity(payload,body?.entityType,body?.entityId):null;
+  if(scoped&&!owner)return fail('Registro inexistente ou empresa inativa.',404);
+  let query=db.from(table).select('id,entity_type,entity_id,client_id,original_name,size_bytes,mime_type,created_at').eq('admin_id',uid).eq('state','ready');
+  if(owner)query=query.eq('entity_type',owner.type).eq('entity_id',owner.id).eq('client_id',owner.clientId);
+  const {data,error}=await query.order('created_at',{ascending:false}).limit(owner?5:1500);
   if(error)throw error;
-  return response({ok:true,attachments:(data||[]).filter((a:any)=>!!internalEntity(payload,a.entity_type,a.entity_id)&&internalEntity(payload,a.entity_type,a.entity_id)?.clientId===a.client_id)});
+  return response({ok:true,attachments:(data||[]).filter((a:any)=>{
+   const record=internalEntity(payload,a.entity_type,a.entity_id);
+   return record?.clientId===a.client_id;
+  })});
  }
  if(action==='internal-start'){
   const owner=internalEntity(payload,body?.entityType,body?.entityId);
@@ -344,7 +353,7 @@ async function adminHandler(uid:string,action:string,body:any){
    for(const d of devices||[])deviceCount.set(d.user_id,(deviceCount.get(d.user_id)||0)+1);
   }
   const publicGrants=(grants||[]).map(({user_id,...access})=>({...access,active_devices:user_id?deviceCount.get(user_id)||0:0}));
-  const {data:notices,error:e2}=await db.from('clyriva_client_notices').select('id,client_id,title,body,due_date,status,created_at,notice_type,amount_cents,reminder_enabled,paid_at').eq('admin_id',uid).order('created_at',{ascending:false}).limit(300);
+  const {data:notices,error:e2}=await db.from('clyriva_client_notices').select('id,client_id,title,body,due_date,status,created_at,notice_type,amount_cents,reminder_enabled,paid_at,source_type,source_id').eq('admin_id',uid).order('created_at',{ascending:false}).limit(300);
   if(e1||e2)throw e1||e2;
   // Auditoria dos lembretes: exibir apenas o ultimo disparo aceito pelo gateway,
   // sem expor endpoints nem credenciais de notificacao ao navegador.
@@ -391,18 +400,18 @@ async function adminHandler(uid:string,action:string,body:any){
  }
  if(action==='mark-paid'){
   const id=String(body?.noticeId||'');if(!/^[0-9a-f-]{36}$/i.test(id))return fail('Cobrança inválida.');
-  const {data,error:e}=await db.from('clyriva_client_notices').update({status:'paid',paid_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',id).eq('admin_id',uid).eq('status','active').eq('reminder_enabled',true).select('id').maybeSingle();
+  const {data,error:e}=await db.from('clyriva_client_notices').update({status:'paid',paid_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',id).eq('admin_id',uid).eq('status','active').eq('reminder_enabled',true).is('source_type',null).select('id').maybeSingle();
   return e?fail('Não foi possível marcar como paga.',500):data?response({ok:true}):fail('Cobrança não encontrada ou já encerrada.',404);
  }
  if(action==='reopen-charge'){
   const id=String(body?.noticeId||'');if(!/^[0-9a-f-]{36}$/i.test(id))return fail('Cobrança inválida.');
-  const {data,error:e}=await db.from('clyriva_client_notices').update({status:'active',paid_at:null,updated_at:new Date().toISOString()}).eq('id',id).eq('admin_id',uid).eq('status','paid').eq('reminder_enabled',true).select('id').maybeSingle();
+  const {data,error:e}=await db.from('clyriva_client_notices').update({status:'active',paid_at:null,updated_at:new Date().toISOString()}).eq('id',id).eq('admin_id',uid).eq('status','paid').eq('reminder_enabled',true).is('source_type',null).select('id').maybeSingle();
   return e?fail('Não foi possível reabrir a cobrança.',500):data?response({ok:true}):fail('Cobrança não encontrada.',404);
  }
  if(action==='update-charge'){
   const id=String(body?.noticeId||'');if(!/^[0-9a-f-]{36}$/i.test(id))return fail('Cobrança inválida.');
   const values=chargeFields(body);if(!values)return fail('Confira tipo, descrição, valor e data de vencimento.');
-  const {data,error:e}=await db.from('clyriva_client_notices').update({...values,updated_at:new Date().toISOString()}).eq('id',id).eq('admin_id',uid).eq('status','active').eq('reminder_enabled',true).select('id').maybeSingle();
+  const {data,error:e}=await db.from('clyriva_client_notices').update({...values,updated_at:new Date().toISOString()}).eq('id',id).eq('admin_id',uid).eq('status','active').eq('reminder_enabled',true).is('source_type',null).select('id').maybeSingle();
   return e?fail('Não foi possível atualizar a cobrança.',500):data?response({ok:true}):fail('Cobrança não encontrada ou encerrada.',404);
  }
  if(action==='archive'){
