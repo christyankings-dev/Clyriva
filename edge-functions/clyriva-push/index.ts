@@ -57,6 +57,8 @@ async function handleSubscribe(userId:string,body:any){
   admin_id:userId,endpoint:sub.endpoint,p256dh:sub.keys.p256dh,auth_secret:sub.keys.auth,enabled:true,updated_at:new Date().toISOString()
  },{onConflict:'endpoint'});
  if(e)return error('Não foi possível registrar este dispositivo.',500);
+ // Uma mesma assinatura de navegador nao deve receber alertas de dois usuarios.
+ await db.from('clyriva_client_push_subscriptions').delete().eq('endpoint',sub.endpoint);
  return respond({ok:true});
 }
 async function handleUnsubscribe(userId:string,body:any){

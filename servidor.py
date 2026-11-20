@@ -31,6 +31,9 @@ ASSETS = {
     'panel.css': 'text/css', 'identity.css': 'text/css', 'rotina.css': 'text/css', 'rotina.js': 'text/javascript',
     'pwa.css':'text/css', 'pwa.js':'text/javascript', 'sw.js':'text/javascript',
     'offline.html':'text/html', 'manifest.webmanifest':'application/manifest+json',
+    'cliente.html':'text/html', 'avisos-admin.html':'text/html',
+    'cliente.css':'text/css', 'cliente.js':'text/javascript', 'avisos-admin.js':'text/javascript',
+    'manifest-cliente.webmanifest':'application/manifest+json',
     'icons/clyriva-192.png':'image/png', 'icons/clyriva-512.png':'image/png',
 }
 PROVIDERS = {
