@@ -84,12 +84,18 @@ function resetPasswordPage(){const cont=$('.login-card');if(!cont)return;cont.in
  recovering=false;history.replaceState({},'',redirectURL());await routeUser();}
  catch(err){statusMessage(errMsg(err),'err');}finally{b.disabled=false;}
 };}
+// A PWA consulta apenas a sessao administrativa valida, sem compartilhar senhas.
+Object.defineProperty(window,'ClyrivaPwaSession',{value:Object.freeze({
+ isAdmin(){return Boolean(sb&&state.mode==='admin'&&state.user);},
+ async token(){if(!sb||state.mode!=='admin'||!state.user)return null;const {data,error}=await sb.auth.getSession();return error?null:data.session?.access_token||null;}
+})});
 function brandSidebar(){return `<div><div class="brand"><span class="brand-logo">C</span><span>Cly<em>riva</em></span></div><div class="brand-sub">Portal contábil</div></div>`}
-function adminShell(){return `<div class="admin-app"><header class="header admin-top"><div class="row" style="gap:10px"><span class="brand-logo" style="height:32px;width:32px;font-size:21px">C</span><div><strong>Clyriva · Gestão privada</strong><small>${esc(state.user?.email||'Administrador')}</small></div></div><nav class="actions"><button class="button sm" id="adm-panel">▦ Painel completo</button><button class="button secondary sm" id="history-btn">Histórico</button></nav><div class="hdr-right"><span id="sync-state" class="pill">Conectado</span><button class="button secondary sm" id="change-password">Alterar senha</button><button class="button secondary sm" id="signout">Sair</button></div></header><div id="admin-body"></div></div>`;}
+function adminShell(){return `<div class="admin-app"><header class="header admin-top"><div class="row" style="gap:10px"><span class="brand-logo" style="height:32px;width:32px;font-size:21px">C</span><div><strong>Clyriva · Gestão privada</strong><small>${esc(state.user?.email||'Administrador')}</small></div></div><nav class="actions"><button class="button sm" id="adm-panel">▦ Painel completo</button><button class="button secondary sm" id="history-btn">Histórico</button><button class="button secondary sm" id="pwa-install-admin" type="button">Instalar app / Alertas</button></nav><div class="hdr-right"><span id="sync-state" class="pill">Conectado</span><button class="button secondary sm" id="change-password">Alterar senha</button><button class="button secondary sm" id="signout">Sair</button></div></header><div id="admin-body"></div></div>`;}
 function renderAdmin(){
  root.innerHTML=adminShell();
  $('#adm-panel').onclick=()=>{if(!state.saving){state.adminTab='panel';renderAdmin();}};
  $('#history-btn').onclick=showHistory;
+ $('#pwa-install-admin').onclick=()=>window.ClyrivaPwa?.open();
  $('#signout').onclick=signout;
  $('#change-password').onclick=changePassword;
  state.frame=null;state.adminTab='panel';

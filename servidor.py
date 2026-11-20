@@ -29,6 +29,9 @@ ASSETS = {
     'core.js': 'text/javascript', 'app.js': 'text/javascript', 'file-demo.js': 'text/javascript',
     'panel.js': 'text/javascript', 'config.js': 'text/javascript', 'vendor/supabase.js': 'text/javascript',
     'panel.css': 'text/css', 'identity.css': 'text/css', 'rotina.css': 'text/css', 'rotina.js': 'text/javascript',
+    'pwa.css':'text/css', 'pwa.js':'text/javascript', 'sw.js':'text/javascript',
+    'offline.html':'text/html', 'manifest.webmanifest':'application/manifest+json',
+    'icons/clyriva-192.png':'image/png', 'icons/clyriva-512.png':'image/png',
 }
 PROVIDERS = {
     'brasilapi': 'https://brasilapi.com.br/api/cnpj/v1/',
@@ -196,7 +199,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def send(self, status, data, mime, headers=None):
         self.send_response(status)
-        self.send_header('Content-Type',mime+'; charset=utf-8')
+        self.send_header('Content-Type',mime+('; charset=utf-8' if not mime.startswith('image/') else ''))
         self.send_header('Content-Length',str(len(data)))
         for key,value in {**security_headers(),**(headers or {})}.items():
             self.send_header(key,value)
@@ -247,7 +250,7 @@ def application(environ,start_response):
         status,body,mime,headers=405,b'Metodo indisponivel.','text/plain',{'Allow':'GET, HEAD'}
     else:
         status,body,mime,headers=resource(environ.get('PATH_INFO','/'),client_ip(environ),environ)
-    fields={'Content-Type':mime+'; charset=utf-8','Content-Length':str(len(body)),**security_headers(),**headers}
+    fields={'Content-Type':mime+('; charset=utf-8' if not mime.startswith('image/') else ''),'Content-Length':str(len(body)),**security_headers(),**headers}
     start_response(str(status)+' '+HTTPStatus(status).phrase,list(fields.items()))
     return [] if method=='HEAD' else [body]
 
