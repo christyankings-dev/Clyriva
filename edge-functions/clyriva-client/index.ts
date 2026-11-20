@@ -84,7 +84,7 @@ function validFileHeader(data:Uint8Array,mime:string){
 async function authorizedAttachment(uid:string,attachmentRaw:any,management:boolean){
  const id=attachmentId(attachmentRaw);if(!id)return null;
  const {data:a,error:e}=await db.from('clyriva_notice_attachments')
-   .select('id,notice_id,admin_id,client_id,storage_path,original_name,mime_type,state')
+   .select('id,notice_id,admin_id,client_id,storage_path,original_name,mime_type,state,source_attachment_id')
    .eq('id',id).eq('state','ready').maybeSingle();
  if(e)throw e;if(!a)return null;
  const {data:n,error:nErr}=await db.from('clyriva_client_notices')
@@ -92,6 +92,12 @@ async function authorizedAttachment(uid:string,attachmentRaw:any,management:bool
  if(nErr)throw nErr;if(!n)return null;
  if(management)return a.admin_id===uid?a:null;
  if(!['active','paid'].includes(n.status))return null;
+ if(a.source_attachment_id){
+  const {data:source,error:sourceError}=await db.from('clyriva_internal_attachments').select('id')
+   .eq('id',a.source_attachment_id).eq('admin_id',a.admin_id).eq('client_id',a.client_id).eq('state','ready').maybeSingle();
+  if(sourceError)throw sourceError;
+  if(!source)return null;
+ }
  const scope=await activeGrants(uid);
  return scope.some(g=>g.admin_id===a.admin_id&&g.client_id===a.client_id)?a:null;
 }
@@ -119,8 +125,62 @@ function internalEntity(payload:any,kind:any,raw:any){
  const record=values.find((x:any)=>x?.id===entityId);
  return record?.clientId&&activeCompany(payload,String(record.clientId))?{type,id:entityId,clientId:String(record.clientId)}:null;
 }
+function publicationFacts(payload:any,owner:any) {
+ const source=(owner.type==='tax'?payload.taxes:payload.tasks).find((row:any)=>row.id===owner.id);
+ return {companyId:owner.clientId,companyName:activeCompany(payload,owner.clientId).name,
+  label:owner.type==='tax'?source.kind:source.title,reference:owner.type==='tax'?String(source.ref||''):'',
+  competence:String(source.competence||''),dueDate:String(source.dueDate||''),amount:owner.type==='tax'?source.value:null,status:source.status};
+}
+// Páginas ordenadas por UUID para evitar que o limite da API produza falsos zeros na agenda.
+async function overviewRows(query:()=>any) {
+ const rows:any[]=[];
+ let cursor='';
+ for (;;) {
+  let page=query().order('id',{ascending:true}).limit(250);
+  if(cursor)page=page.gt('id',cursor);
+  const {data,error}=await page;
+  if(error)throw error;
+  rows.push(...data);
+  if(data.length<250)return rows;
+  cursor=data[data.length-1].id;
+ }
+}
+async function internalOverview(uid:string,payload:any,clientId:string) {
+ const active=new Set((payload?.clients||[]).filter((c:any)=>c.status!=='inactive').map((c:any)=>c.id));
+ const records=new Map<string,any>();
+ const key=(c:string,type:string,id:string)=>JSON.stringify([c,type,id]);
+ for(const [type,rows] of [['tax',payload?.taxes],['task',payload?.tasks]] as const){
+  for(const row of rows||[]){
+   if(!active.has(row.clientId)||(clientId&&row.clientId!==clientId)||row.status==='paid'||row.status==='done')continue;
+   records.set(key(row.clientId,type,row.id),{clientId:row.clientId,type,id:row.id,files:0,privateFiles:0,status:'internal'});
+  }
+ }
+ if(!records.size)return response({ok:true,records:[]});
+ const scoped=(query:any)=>clientId?query.eq('client_id',clientId):query;
+ const [docs,notices]=await Promise.all([
+  overviewRows(()=>scoped(db.from('clyriva_internal_attachments').select('id,entity_type,entity_id,client_id').eq('admin_id',uid).eq('state','ready'))),
+  overviewRows(()=>scoped(db.from('clyriva_client_notices').select('id,client_id,source_type,source_id,status,clyriva_notice_attachments(source_attachment_id,state)').eq('admin_id',uid).in('source_type',['tax','task'])))
+ ]);
+ const copies=new Map<string,Set<string>>();
+ for(const notice of notices){
+  const k=key(notice.client_id,notice.source_type,notice.source_id);
+  const record=records.get(k);
+  if(!record)continue;
+  record.status=notice.status;
+  copies.set(k,new Set((notice.clyriva_notice_attachments||[]).filter((a:any)=>a.state==='ready').map((a:any)=>a.source_attachment_id)));
+ }
+ for(const doc of docs){
+  const k=key(doc.client_id,doc.entity_type,doc.entity_id);
+  const record=records.get(k);
+  if(!record)continue;
+  record.files++;
+  if(!copies.get(k)?.has(doc.id))record.privateFiles++;
+ }
+ return response({ok:true,records:[...records.values()]});
+}
 async function internalDocuments(uid:string,action:string,body:any,payload:any){
  const table='clyriva_internal_attachments';
+ if(action==='internal-overview')return await internalOverview(uid,payload,String(body.clientId||''));
  if(action==='internal-unpublish'){
   const kind=String(body?.entityType||''),entityId=String(body?.entityId||'');
   if(!['task','tax'].includes(kind)||entityId.length<6||entityId.length>120)return fail('Registro inválido.');
@@ -131,7 +191,12 @@ async function internalDocuments(uid:string,action:string,body:any,payload:any){
   // Anexos da carteira deixam de ser vinculados após a exclusão do registro.
   const {data:old,error:oe}=await db.from(table).select('id,storage_path').eq('admin_id',uid).eq('entity_type',kind).eq('entity_id',entityId).limit(100);
   if(oe)throw oe;
-  if(old?.length){await db.storage.from(DOC_BUCKET).remove(old.map(x=>x.storage_path));await db.from(table).delete().eq('admin_id',uid).in('id',old.map(x=>x.id));}
+  if(old?.length){
+   const {error:storageError}=await db.storage.from(DOC_BUCKET).remove(old.map(x=>x.storage_path));
+   if(storageError)return fail('Aviso arquivado. A limpeza dos arquivos internos ficou pendente.',503);
+   const {error:rowError}=await db.from(table).delete().eq('admin_id',uid).in('id',old.map(x=>x.id));
+   if(rowError)throw rowError;
+  }
   return response({ok:true});
  }
  if(action==='internal-publish'||action==='internal-sync'){
@@ -139,6 +204,11 @@ async function internalDocuments(uid:string,action:string,body:any,payload:any){
   if(!owner)return fail('Salve primeiro o registro em uma empresa ativa.',404);
   const source=(owner.type==='task'?payload.tasks:payload.taxes).find((x:any)=>x.id===owner.id);
   if(!source)return fail('Registro inexistente.',404);
+  if(action==='internal-publish'&&body.expectedSource!==undefined){
+   const facts=publicationFacts(payload,owner);
+   if(!body.expectedSource||Object.entries(facts).some(([key,value])=>body.expectedSource[key]!==value))
+    return fail('O lançamento mudou. Confira a prévia novamente.',409);
+  }
   const isTax=owner.type==='tax';
   const rawType=String(source.kind||'');
   const kind=isTax?(CHARGE_TYPES.includes(rawType)?rawType:'Guia'):'Aviso';
@@ -151,45 +221,60 @@ async function internalDocuments(uid:string,action:string,body:any,payload:any){
     status:isTax?(source.status==='paid'?'paid':'active'):(source.status==='done'?'archived':'active'),
     notice_type:kind,reminder_enabled:isTax,amount_cents:isTax?parseBrlCents(source.value):null,
     updated_at:new Date().toISOString()};
-  const {data:found,error:lookupError}=await db.from('clyriva_client_notices').select('id,status,client_id').eq('admin_id',uid).eq('source_type',owner.type).eq('source_id',owner.id).maybeSingle();
+  const {data:found,error:lookupError}=await db.from('clyriva_client_notices').select('id,status,client_id,updated_at').eq('admin_id',uid).eq('source_type',owner.type).eq('source_id',owner.id).maybeSingle();
   if(lookupError)throw lookupError;
   if(found&&found.client_id!==owner.clientId)return fail('Registro publicado para outra empresa. Arquive o aviso anterior antes de mudar a empresa.',409);
   if(action==='internal-sync'&&!found)return response({ok:true,skipped:true});
   // Respeita a opção de arquivar no app: edições administrativas não republicam
   // automaticamente comunicados que foram ocultados do cliente.
   if(action==='internal-sync'&&found?.status==='archived')data.status='archived';
-  if(action==='internal-sync'&&found)delete data.body; // Preserva a mensagem editada na área de avisos.
+  if(found)delete data.body; // A mensagem da gestão sobrevive a uma nova publicação.
+  if(isTax)data.paid_at=source.status==='paid'&&validISODate(source.paidAt)?source.paidAt+'T12:00:00Z':null;
+  // Somente uma publicação expressa pode copiar novos arquivos. Uma baixa sincroniza só os dados.
+  const internal=action==='internal-publish'
+   ? await db.from(table).select('id,storage_path,original_name,mime_type,size_bytes')
+      .eq('admin_id',uid).eq('entity_type',owner.type).eq('entity_id',owner.id).eq('client_id',owner.clientId).eq('state','ready').order('id').limit(5)
+   : null;
+  if(internal?.error)throw internal.error;
+  const files=internal?.data||[];
+  if(action==='internal-publish'&&body.attachmentIds!==undefined){
+   const ids=body.attachmentIds;
+   if(!Array.isArray(ids)||ids.length!==files.length||!files.every((file:any)=>ids.includes(file.id)))
+    return fail('Os documentos mudaram. Confira a lista e confirme a publicação novamente.',409);
+  }
   let noticeId=found?.id;
-  if(noticeId){const {error:updateError}=await db.from('clyriva_client_notices').update(data).eq('id',noticeId).eq('admin_id',uid);if(updateError)throw updateError;}
+  if(found){
+   const latest=await workspace(uid);
+   const current=internalEntity(latest,owner.type,owner.id);
+   if(!current||current.clientId!==owner.clientId||
+      JSON.stringify(publicationFacts(latest,current))!==JSON.stringify(publicationFacts(payload,owner)))
+    return fail('A ficha mudou. Atualize o lançamento antes de continuar.',409);
+  }
+  if(noticeId){
+   // O gatilho da carteira atualiza a baixa no mesmo commit. Uma resposta antiga não pode sobrescrevê-la.
+   const {data:updated,error:updateError}=await db.from('clyriva_client_notices').update(data)
+    .eq('id',noticeId).eq('admin_id',uid).eq('updated_at',found.updated_at).select('id').maybeSingle();
+   if(updateError)throw updateError;
+   if(!updated)return fail('O aviso mudou. Confira o lançamento novamente.',409);
+  }
   else{
    const {data:inserted,error:createError}=await db.from('clyriva_client_notices').insert({admin_id:uid,client_id:owner.clientId,source_type:owner.type,source_id:owner.id,...data}).select('id').single();
    if(createError?.code==='23505'){
-    const {data:prior,error:priorError}=await db.from('clyriva_client_notices').select('id').eq('admin_id',uid).eq('source_type',owner.type).eq('source_id',owner.id).maybeSingle();if(priorError||!prior)return fail('Já existe aviso; atualize a página e tente novamente.',409);noticeId=prior.id;
+    const {data:prior,error:priorError}=await db.from('clyriva_client_notices').select('id,client_id').eq('admin_id',uid).eq('source_type',owner.type).eq('source_id',owner.id).maybeSingle();if(priorError||!prior||prior.client_id!==owner.clientId)return fail('Já existe aviso; atualize a página e tente novamente.',409);noticeId=prior.id;
    }else if(createError||!inserted)return fail('Não foi possível publicar.',500);
    else noticeId=inserted.id;
   }
-  // Sincronizar arquivos de registros já publicados, inclusive ao editar/salvar.
-  const {data:internal,error:docError}=await db.from(table).select('id,storage_path,original_name,mime_type,size_bytes').eq('admin_id',uid).eq('entity_type',owner.type).eq('entity_id',owner.id).eq('state','ready').limit(5);
-  if(docError)throw docError;
+  if(action==='internal-sync')return response({ok:true,noticeId,status:data.status,updated:true});
+  // Exclusões explícitas de originais são tratadas por internal-remove.
   const {data:existing,error:attachmentsErr}=await db.from('clyriva_notice_attachments').select('id,source_attachment_id,storage_path').eq('notice_id',noticeId);
   if(attachmentsErr)throw attachmentsErr;
-  const readyIds=new Set((internal||[]).map((item:any)=>item.id));
-  let removed=0,attachmentErrors=0;
-  // Um anexo interno removido não pode permanecer eternamente exposto no aplicativo.
-  // Preservar anexos enviados diretamente na tela de comunicados (sem source_attachment_id).
-  for(const old of existing||[]){
-   if(!old.source_attachment_id||readyIds.has(old.source_attachment_id))continue;
-   const {error:deleteFileError}=await db.storage.from(DOC_BUCKET).remove([old.storage_path]);
-   if(deleteFileError){attachmentErrors++;continue;}
-   const {error:deleteRowError}=await db.from('clyriva_notice_attachments').delete().eq('id',old.id).eq('notice_id',noticeId);
-   if(deleteRowError){attachmentErrors++;continue;}
-   removed++;
-  }
+  let attachmentErrors=0;
   const copied=new Set((existing||[]).map((d:any)=>d.source_attachment_id).filter(Boolean));let attachmentsAdded=0;
-  for(const item of internal||[]){
+  for(const item of files){
    if(copied.has(item.id))continue;
-   const {count}=await db.from('clyriva_notice_attachments').select('id',{count:'exact',head:true}).eq('notice_id',noticeId);
-   if((count||0)>=5)break;
+   const {count,error:countError}=await db.from('clyriva_notice_attachments').select('id',{count:'exact',head:true}).eq('notice_id',noticeId);
+   if(countError)throw countError;
+   if((count||0)>=5){attachmentErrors++;continue;}
    const {data:blob,error:readErr}=await db.storage.from(DOC_BUCKET).download(item.storage_path);
    if(readErr||!blob){attachmentErrors++;continue;}
    const ext=item.mime_type==='application/pdf'?'pdf':item.mime_type==='image/png'?'png':'jpg';
@@ -197,10 +282,10 @@ async function internalDocuments(uid:string,action:string,body:any,payload:any){
    const {error:uploadErr}=await db.storage.from(DOC_BUCKET).upload(dest,blob,{contentType:item.mime_type,upsert:false});
    if(uploadErr){attachmentErrors++;continue;}
    const {error:insertErr}=await db.from('clyriva_notice_attachments').insert({admin_id:uid,client_id:owner.clientId,notice_id:noticeId,storage_path:dest,original_name:item.original_name,mime_type:item.mime_type,size_bytes:item.size_bytes,state:'ready',source_attachment_id:item.id});
-   if(insertErr){await db.storage.from(DOC_BUCKET).remove([dest]);attachmentErrors++;continue;}
+   if(insertErr){await db.storage.from(DOC_BUCKET).remove([dest]);if(insertErr.code!=='23505')attachmentErrors++;continue;}
    attachmentsAdded++;
   }
-  return response({ok:true,noticeId,created:!found,updated:!!found,attachmentsAdded,attachmentsRemoved:removed,attachmentErrors,reminders:isTax?[3,2,1,0]:[]});
+  return response({ok:true,noticeId,created:!found,updated:!!found,attachmentsAdded,status:data.status,attachmentErrors,reminders:isTax?[3,2,1,0]:[]});
  }
  if(action==='internal-list'){
   // Ao abrir um registro, carregar só seus anexos, com checagem da empresa no servidor.
@@ -211,7 +296,14 @@ async function internalDocuments(uid:string,action:string,body:any,payload:any){
   if(owner)query=query.eq('entity_type',owner.type).eq('entity_id',owner.id).eq('client_id',owner.clientId);
   const {data,error}=await query.order('created_at',{ascending:false}).limit(owner?5:1500);
   if(error)throw error;
-  return response({ok:true,attachments:(data||[]).filter((a:any)=>{
+  let audience;
+  if(owner&&body.preview===true){
+   const result=await db.from('clyriva_client_access').select('email',{count:'exact'}).eq('admin_id',uid).eq('client_id',owner.clientId)
+    .eq('enabled',true).not('user_id','is',null).order('email').limit(8);
+   if(result.error)throw result.error;
+   audience={count:result.count,emails:(result.data||[]).map((g:any)=>g.email)};
+  }
+  return response({ok:true,audience,source:audience?publicationFacts(payload,owner):undefined,attachments:(data||[]).filter((a:any)=>{
    const record=internalEntity(payload,a.entity_type,a.entity_id);
    return record?.clientId===a.client_id;
   })});

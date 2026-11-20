@@ -4,18 +4,17 @@
   const {brl, cents, validDate, monthLabel, dateLabel} = window.ClyrivaCore;
   const byText = new Intl.Collator('pt-BR', {numeric: true});
   const ranges = [
-    ['attention', 'Atrasados e próximos 7 dias'],
-    ['late', 'Somente atrasados'],
-    ['today', 'Vencem hoje'],
-    ['next', 'Próximos 7 dias'],
-    ['all', 'Todos em aberto']
+    ['attention', 'Atrasados e próximos 7 dias'], ['late', 'Atrasados'],
+    ['today', 'Hoje'], ['soon', 'Próximos 3 dias'], ['next', 'Próximos 7 dias'],
+    ['waiting', 'Aguardando cliente'], ['missing', 'Guias sem anexo'],
+    ['unsent', 'Guias com envio pendente'], ['published', 'Guias publicadas'],
+    ['archived', 'Guias arquivadas no app'], ['all', 'Todos em aberto']
   ];
+  const documentRanges = new Set(['missing', 'unsent', 'published', 'archived']);
   const dayMs = 86400000;
   const pageSize = 5;
-  function localDate() {
-    const now = new Date();
-    return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
-  }
+  const brazilCalendar = new Intl.DateTimeFormat('sv-SE', {timeZone:'America/Sao_Paulo', year:'numeric', month:'2-digit', day:'2-digit'});
+  function localDate() { return brazilCalendar.format(new Date()); }
   function element(tag, className, text) {
     const el = document.createElement(tag);
     if (className) el.className = className;
@@ -36,121 +35,186 @@
       for (const row of rows) {
         if (row.status === (type === 'tax' ? 'paid' : 'done')) continue;
         items.push({
-          type, id: row.id,
+          type, id: row.id, clientId: row.clientId,
           title: type === 'tax' ? cleanText(row.kind) || 'Guia' : cleanText(row.title) || 'Tarefa',
           company: companyName ? cleanText(companyName(row.clientId)) : '',
-          competence: row.competence,
+          competence: row.competence, waiting: row.awaitingClient === true,
           due: validDate(row.dueDate) ? row.dueDate : '',
+          priority: ({critical:0,high:1,medium:2,low:3})[row.priority] ?? 2,
           value: type === 'tax' ? row.value : null
         });
       }
     }
     return items.sort((a, b) => (a.due || '9999-99-99').localeCompare(b.due || '9999-99-99')
-      || byText.compare(a.company, b.company) || byText.compare(a.title, b.title));
+      || a.priority-b.priority || byText.compare(a.company, b.company) || byText.compare(a.title, b.title));
   }
-  function inRange(days, range) {
-    if (range === 'all') return true;
-    if (days === null) return false;
+  function matches(range, item, days, doc) {
     switch (range) {
-      case 'late': return days < 0;
+      case 'all': return true;
+      case 'late': return days !== null && days < 0;
       case 'today': return days === 0;
+      case 'soon': return days >= 1 && days <= 3;
       case 'next': return days >= 1 && days <= 7;
-      default: return days <= 7;
+      case 'waiting': return item.type === 'task' && item.waiting;
+      case 'missing': return item.type === 'tax' && doc?.files === 0;
+      case 'unsent': return item.type === 'tax' && doc && doc.status !== 'archived' &&
+        (doc.status === 'internal' || doc.privateFiles > 0);
+      case 'published': return item.type === 'tax' && ['active','paid'].includes(doc?.status);
+      case 'archived': return item.type === 'tax' && doc?.status === 'archived';
+      default: return days !== null && days <= 7;
     }
   }
   function relativeDay(days) {
     if (days === null) return 'Sem prazo';
-    if (days < 0) return 'Em atraso';
+    if (days < 0) return Math.abs(days)+(days === -1 ? ' dia de atraso' : ' dias de atraso');
     if (days === 0) return 'Hoje';
     if (days === 1) return 'Amanhã';
     return 'Em '+days+' dias';
   }
-  function mountAgenda(host, {taxes, tasks, companyName, onAction}, view) {
+  function documentLabel(doc) {
+    if (!doc) return '';
+    if (doc.status === 'archived') return 'Arquivada no app';
+    if (doc.status === 'internal') return doc.files ? 'Com anexo · ainda não publicada' : 'Sem anexo · uso interno';
+    if (doc.privateFiles) return 'Publicada · há anexo interno para revisar';
+    return doc.files ? 'Publicada com anexo' : 'Publicada · sem anexo na ficha';
+  }
+  function mountAgenda(host, {taxes, tasks, companyName, onAction, loadDocuments}, view) {
     const items = openItems(taxes, tasks, companyName);
+    const key = item => JSON.stringify([item.clientId, item.type, item.id]);
+    let documents, loading = false, failed = false, refreshPending = false;
     host.className = 'routine-agenda';
     host.setAttribute('aria-labelledby', 'agenda-heading');
-    const head = element('div', 'routine-agenda-head');
-    const title = element('h2', '', 'Agenda de vencimentos');
+    const title = element('h2', '', 'Meu dia / Minha semana');
     title.id = 'agenda-heading';
-    const caption = element('p', '', 'Guias e tarefas em aberto de todas as competências.');
     const heading = element('div');
-    heading.append(title, caption);
-    const label = element('label', 'routine-filter', 'Prazo');
+    heading.append(title, element('p', '', 'Guias e pendências em aberto de todas as competências. Prazos no horário de Brasília.'));
+    const head = element('div', 'routine-agenda-head');
+    const label = element('label', 'routine-filter', 'Mostrar');
     const select = document.createElement('select');
     select.id = 'agenda-periodo';
-    ranges.forEach(([id, text]) => select.add(new Option(text, id)));
+    const options = ranges.filter(([id]) => loadDocuments || !documentRanges.has(id));
+    options.forEach(([id, text]) => select.add(new Option(text, id)));
+    if (!options.some(([id]) => id === view.range)) view.range = 'attention';
     select.value = view.range;
-    label.append(select);
-    head.append(heading, label);
+    label.append(select); head.append(heading, label);
+    const cards = element('div', 'routine-cards');
+    const counters = new Map();
+    for (const [id, text] of options.filter(([id]) => !['attention','all','archived'].includes(id))) {
+      const card = button('', 'routine-counter');
+      const number = element('strong');
+      card.dataset.range = id;
+      card.append(number, element('span','',text));
+      card.onclick = () => choose(id);
+      counters.set(id, {card, number});
+      cards.append(card);
+    }
+    const feedback = element('div', 'routine-agenda-foot');
+    const message = element('span', 'routine-count');
+    message.setAttribute('role','status');
+    const retry = button('Atualizar documentos', 'routine-link');
+    retry.onclick = () => refresh();
+    feedback.append(message, retry);
     const list = element('ul', 'routine-dates');
     const foot = element('div', 'routine-agenda-foot');
     const count = element('span', 'routine-count');
-    count.setAttribute('role', 'status');
+    count.setAttribute('role','status');
     const more = button('Mostrar mais', 'routine-link');
     more.id = 'agenda-mais';
     foot.append(count, more);
-    host.replaceChildren(head, list, foot);
+    host.replaceChildren(head, cards, feedback, list, foot);
 
+    function choose(range) {
+      view.range = range; view.limit = pageSize; select.value = range;
+      draw();
+    }
+    function rowFor({item, days, doc}) {
+      const row = element('li', 'routine-date');
+      const due = element('div', 'routine-due');
+      const color = days === null ? '' : days < 0 ? ' is-late' : days === 0 ? ' is-today' : '';
+      due.append(element('strong', 'routine-tag'+color, relativeDay(days)));
+      if (item.due) {
+        const time = element('time', '', dateLabel(item.due));
+        time.dateTime = item.due; due.append(time);
+      }
+      const details = element('div', 'routine-item');
+      details.append(element('strong', '', item.title));
+      const fields = [item.company, item.type === 'tax' ? brl(item.value) : 'Pendência'];
+      if (item.competence) fields.push('Competência '+monthLabel(item.competence));
+      details.append(element('small', '', fields.filter(Boolean).join(' · ')));
+      if (doc && item.type === 'tax') details.append(element('small', 'routine-doc-status', documentLabel(doc)));
+      if (item.waiting) details.append(element('small', '', 'Aguardando cliente'));
+      row.append(due, details);
+      if (onAction) {
+        const acts = element('div', 'routine-actions');
+        function action(label, verb, id) {
+          const act = button(label,'routine-link');
+          act.setAttribute('aria-label', label+' — '+item.title+' — '+item.company);
+          act.onclick = () => onAction(verb,id);
+          acts.append(act);
+        }
+        action('Abrir ficha','view-client',item.clientId);
+        if (doc) {
+          action(doc.files ? 'Documentos' : 'Anexar','docs-'+item.type,item.id);
+          if (doc.status === 'internal' || doc.privateFiles > 0 || doc.status === 'archived')
+            action(doc.status === 'archived' ? 'Revisar publicação' : 'Publicar','publish-'+item.type,item.id);
+        }
+        if (item.type === 'tax') action('Registrar pagamento','pay-tax',item.id);
+        else action('Concluir tarefa','complete-task',item.id);
+        row.append(acts);
+      }
+      return row;
+    }
     function draw() {
       const today = Date.parse(localDate()+'T00:00:00Z');
-      const visible = [];
-      for (const item of items) {
-        const days = item.due ? (Date.parse(item.due+'T00:00:00Z')-today)/dayMs : null;
-        if (inRange(days, view.range)) visible.push({item, days});
+      const rows = items.map(item => ({item, days:item.due ? (Date.parse(item.due+'T00:00:00Z')-today)/dayMs : null, doc:documents?.get(key(item))}));
+      for (const [id, {card,number}] of counters) {
+        const unknown = documentRanges.has(id) && !documents;
+        number.textContent = unknown ? '—' : String(rows.filter(r => matches(id,r.item,r.days,r.doc)).length);
+        card.disabled = unknown;
+        card.setAttribute('aria-pressed', String(id === view.range));
       }
-      const shown = visible.slice(0, view.limit);
-      const fragment = document.createDocumentFragment();
-      for (const {item, days} of shown) {
-        const row = element('li', 'routine-date');
-        const due = element('div', 'routine-due');
-        const color = days === null ? '' : days < 0 ? ' is-late' : days === 0 ? ' is-today' : '';
-        due.append(element('strong', 'routine-tag'+color, relativeDay(days)));
-        if (item.due) {
-          const time = element('time', '', dateLabel(item.due));
-          time.dateTime = item.due;
-          due.append(time);
-        }
-        const details = element('div', 'routine-item');
-        details.append(element('strong', '', item.title));
-        const fields = [item.company, item.type === 'tax' ? 'Guia' : 'Tarefa'];
-        if (item.type === 'tax') fields.push(brl(item.value));
-        if (item.competence) fields.push('Competência '+monthLabel(item.competence));
-        details.append(element('small', '', fields.filter(Boolean).join(' · ')));
-        row.append(due, details);
-        if (onAction) {
-          const act = button(item.type === 'tax' ? 'Registrar pagamento' : 'Concluir tarefa', 'routine-link');
-          act.setAttribute('aria-label', act.textContent+' — '+item.title+' — '+item.company);
-          act.onclick = () => onAction(item.type, item.id);
-          row.append(act);
-        }
-        fragment.append(row);
-      }
-      list.replaceChildren(fragment);
+      feedback.hidden = !loadDocuments;
+      retry.disabled = loading;
+      message.textContent = failed ? 'Não foi possível conferir os anexos e as publicações.' : loading ? 'Conferindo anexos e publicações…' : '';
+      const unknown = documentRanges.has(view.range) && !documents;
+      const visible = unknown ? [] : rows.filter(r => matches(view.range,r.item,r.days,r.doc));
+      const shown = visible.slice(0,view.limit);
+      list.replaceChildren(...shown.map(rowFor));
       list.hidden = !shown.length;
-      count.textContent = visible.length ? shown.length+' de '+visible.length+(visible.length === 1 ? ' item' : ' itens')
-        : 'Nenhuma guia ou tarefa em aberto neste filtro.';
+      count.textContent = unknown ? 'Aguardando a consulta de documentos.' : visible.length ? shown.length+' de '+visible.length+(visible.length===1?' item':' itens') : 'Nenhum item em aberto neste filtro.';
       more.hidden = shown.length >= visible.length;
     }
-    select.onchange = () => {view.range = select.value; view.limit = pageSize; draw();};
-    more.onclick = () => {
-      view.limit += pageSize;
-      draw();
-      if (more.hidden) select.focus({preventScroll: true});
-    };
-    host.addEventListener('routine-day-change', draw);
-    draw();
+    async function refresh() {
+      if (!loadDocuments) return;
+      if (loading) {refreshPending = true; return;}
+      documents = undefined; loading = true; failed = false; draw();
+      try {
+        const result = await loadDocuments();
+        if (!Array.isArray(result.records)) throw Error('Resposta incompleta.');
+        documents = new Map(result.records.map(r => [key(r),r]));
+      } catch { failed = true; }
+      finally {
+        loading = false;
+        if (host.isConnected) {
+          if (refreshPending) {refreshPending = false; refresh();} else draw();
+        }
+      }
+    }
+    select.onchange = () => choose(select.value);
+    more.onclick = () => { view.limit += pageSize; draw(); if (more.hidden) select.focus({preventScroll:true}); };
+    host.addEventListener('routine-day-change',draw);
+    host.addEventListener('routine-doc-change',refresh);
+    if (loadDocuments) refresh(); else draw();
   }
 
-  // Atualiza a data local ao virar o dia e ao retornar a uma aba suspensa.
-  // O temporizador não mantém referências a empresas de uma sessão encerrada.
-  let dateTimer;
+  let dateTimer, lastDay = localDate();
   function refreshDate() {
     clearTimeout(dateTimer);
     if (document.hidden) return;
-    document.querySelector('.routine-agenda')?.dispatchEvent(new Event('routine-day-change'));
-    const now = new Date();
-    const nextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1);
-    dateTimer = setTimeout(refreshDate, nextDay-now+100);
+    const day = localDate();
+    if (day !== lastDay) document.querySelector('.routine-agenda')?.dispatchEvent(new Event('routine-day-change'));
+    lastDay = day;
+    dateTimer = setTimeout(refreshDate,60000);
   }
   document.addEventListener('visibilitychange', refreshDate);
   window.addEventListener('pageshow', refreshDate);

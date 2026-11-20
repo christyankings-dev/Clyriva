@@ -47,3 +47,12 @@
   .routine-dialog::backdrop,.routine-dialog .routine-summary-tools,.routine-dialog .routine-feedback,.routine-dialog .routine-manual-copy,.routine-dialog .routine-print-frame{display:none!important}
   .routine-summary-sheet{padding:0}.routine-summary-sheet li{break-inside:avoid}.routine-summary-sheet h2{break-after:avoid}
 }
+
+.routine-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:16px}
+.routine-counter{display:flex;align-items:center;gap:9px;text-align:left;min-width:0;padding:9px 11px;border:1px solid #c8d9d7;border-radius:9px;background:#f6faf9;color:#24464a;cursor:pointer;font:inherit}
+.routine-counter strong{font-size:19px;line-height:1.2}.routine-counter span{font-size:12px;line-height:1.3}
+.routine-counter[aria-pressed=true]{background:#e0f2ed;border-color:#167361;color:#145d50}
+.routine-counter:disabled{color:#697b7c;cursor:default}.routine-actions{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end;max-width:310px}
+.routine-agenda-foot[hidden]{display:none}.routine-doc-status{font-weight:650}
+@media(max-width:900px){.routine-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:660px){.routine-actions{grid-column:1/-1;justify-content:flex-start;max-width:none}.routine-actions button,.routine-counter{min-height:42px}}

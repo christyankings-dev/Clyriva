@@ -48,7 +48,7 @@ class InternalDocsTest(unittest.TestCase):
   self.assertIn("found?.status==='archived'",edge)
  def test_internal_notes_not_shared(self):
   self.assertNotIn("String(source.notes||'')",edge)
-  self.assertIn("if(action==='internal-sync'&&found)delete data.body",edge)
+  self.assertIn("if(found)delete data.body",edge)
  def test_only_one_vendor_script(self):
   self.assertEqual(html.count('src="vendor/supabase.js"'),1)
  def test_file_size_limit(self):
