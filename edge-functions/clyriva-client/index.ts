@@ -13,6 +13,10 @@ const HEADERS={...CORS,'Cache-Control':'no-store','X-Content-Type-Options':'nosn
 const response=(v:unknown,status=200)=>new Response(JSON.stringify(v),{status,headers:HEADERS});
 const fail=(message:string,status=400)=>response({ok:false,error:message},status);
 const jsonLimit=6500;
+const DOC_BUCKET='clyriva-client-attachments';
+const DOC_MAX=5*1024*1024;
+const DOC_MIMES=new Set(['application/pdf','image/jpeg','image/png']);
+const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function emailValid(x:unknown):x is string{return typeof x==='string'&&x.length>=6&&x.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x);}
 function validEndpoint(x:unknown):x is string{
  if(typeof x!=='string'||x.length<25||x.length>2048)return false;
@@ -64,9 +68,113 @@ function chargeFields(body:any){
  if(!CHARGE_TYPES.includes(kind)||title.length<3||title.length>140||details.length>1500||!validISODate(due)||amount===null)return null;
  return {notice_type:kind,title,body:details.length>=5?details:'Cobrança cadastrada pela sua gestão. Consulte os detalhes antes de pagar.',due_date:due,amount_cents:amount};
 }
+// Somente o servidor consulta os caminhos privados. O browser recebe links assinados
+// após autorizar o usuário + a empresa + a cobrança, nunca a chave de serviço.
+function attachmentId(raw:any){const value=String(raw||'');return UUID_RE.test(value)?value:null;}
+function cleanFilename(raw:any){const name=String(raw||'').split(/[\\/]/).pop()||'';
+ const clean=name.replace(/[\x00-\x1f\x7f<>:"|?*]/g,'_').trim();
+ return clean.slice(0,120);
+}
+function validFileHeader(data:Uint8Array,mime:string){
+ if(mime==='application/pdf')return data.length>=5&&data[0]===37&&data[1]===80&&data[2]===68&&data[3]===70&&data[4]===45;
+ if(mime==='image/png')return data.length>=8&&[137,80,78,71,13,10,26,10].every((x,i)=>data[i]===x);
+ if(mime==='image/jpeg')return data.length>=3&&data[0]===255&&data[1]===216&&data[2]===255;
+ return false;
+}
+async function authorizedAttachment(uid:string,attachmentRaw:any,management:boolean){
+ const id=attachmentId(attachmentRaw);if(!id)return null;
+ const {data:a,error:e}=await db.from('clyriva_notice_attachments')
+   .select('id,notice_id,admin_id,client_id,storage_path,original_name,mime_type,state')
+   .eq('id',id).eq('state','ready').maybeSingle();
+ if(e)throw e;if(!a)return null;
+ const {data:n,error:nErr}=await db.from('clyriva_client_notices')
+   .select('id,admin_id,client_id,status').eq('id',a.notice_id).eq('admin_id',a.admin_id).eq('client_id',a.client_id).maybeSingle();
+ if(nErr)throw nErr;if(!n)return null;
+ if(management)return a.admin_id===uid?a:null;
+ if(!['active','paid'].includes(n.status))return null;
+ const scope=await activeGrants(uid);
+ return scope.some(g=>g.admin_id===a.admin_id&&g.client_id===a.client_id)?a:null;
+}
+async function attachmentLink(uid:string,body:any,management:boolean){
+ const a=await authorizedAttachment(uid,body?.attachmentId,management);
+ if(!a)return fail('Documento indisponível para esta conta.',404);
+ const options=body?.download===true?{download:a.original_name}:undefined;
+ const {data,error:e}=await db.storage.from(DOC_BUCKET).createSignedUrl(a.storage_path,60,options);
+ if(e||!data?.signedUrl)return fail('Não foi possível abrir o documento.',503);
+ return response({ok:true,url:data.signedUrl,name:a.original_name,expiresIn:60});
+}
+async function attachmentList(ids:string[]){
+ if(!ids.length)return [];
+ const {data,error:e}=await db.from('clyriva_notice_attachments')
+  .select('id,notice_id,original_name,mime_type,size_bytes,created_at')
+  .in('notice_id',ids).eq('state','ready').order('created_at',{ascending:false}).limit(500);
+ if(e)throw e;return data||[];
+}
 async function adminHandler(uid:string,action:string,body:any){
  const payload=await workspace(uid),customers=Array.isArray(payload?.clients)?payload.clients:[];
  const clientId=String(body?.clientId||'').trim();
+ if(action==='attachment-link')return await attachmentLink(uid,body,true);
+ if(action==='attachment-start'){
+  const noticeId=attachmentId(body?.noticeId),name=cleanFilename(body?.fileName),mime=String(body?.mimeType||''),size=Number(body?.sizeBytes);
+  if(!noticeId||!name||!DOC_MIMES.has(mime)||!Number.isSafeInteger(size)||size<1||size>DOC_MAX)return fail('Anexe um PDF, JPG ou PNG com até 5 MB.');
+  const {data:notice,error:nErr}=await db.from('clyriva_client_notices').select('id,admin_id,client_id')
+     .eq('id',noticeId).eq('admin_id',uid).maybeSingle();
+  if(nErr)throw nErr;if(!notice||!activeCompany(payload,notice.client_id))return fail('Cobrança inexistente ou empresa inativa.',404);
+  // Uploads pendentes expiram após o prazo do link assinado; liberar tentativas
+  // antigas para que uma conexão interrompida não bloqueie anexos futuros.
+  const expired=new Date(Date.now()-2*60*60*1000).toISOString();
+  const {data:stale,error:staleError}=await db.from('clyriva_notice_attachments')
+    .select('id,storage_path').eq('notice_id',noticeId).eq('admin_id',uid)
+    .eq('state','pending').lt('created_at',expired).limit(10);
+  if(staleError)throw staleError;
+  if(stale?.length){await db.storage.from(DOC_BUCKET).remove(stale.map(x=>x.storage_path));
+    await db.from('clyriva_notice_attachments').delete().in('id',stale.map(x=>x.id)).eq('admin_id',uid);}
+  const {count,error:cErr}=await db.from('clyriva_notice_attachments').select('id',{count:'exact',head:true}).eq('notice_id',noticeId);
+  if(cErr)throw cErr;if((count||0)>=5)return fail('Limite de 5 anexos por cobrança. Remova um documento antes de continuar.',409);
+  const id=crypto.randomUUID();const ext=mime==='application/pdf'?'pdf':mime==='image/png'?'png':'jpg';
+  const path=`${uid}/${notice.client_id.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,50)}/${noticeId}/${id}.${ext}`;
+  const {error:insertError}=await db.from('clyriva_notice_attachments').insert({id,notice_id:noticeId,admin_id:uid,client_id:notice.client_id,storage_path:path,original_name:name,mime_type:mime,size_bytes:size});
+  if(insertError)return fail('Não foi possível preparar o anexo.',500);
+  const {data:signed,error:uErr}=await db.storage.from(DOC_BUCKET).createSignedUploadUrl(path);
+  if(uErr||!signed?.token){await db.from('clyriva_notice_attachments').delete().eq('id',id).eq('admin_id',uid);return fail('Falha ao preparar upload privado.',503);}
+  return response({ok:true,attachmentId:id,path:signed.path,token:signed.token,maxBytes:DOC_MAX});
+ }
+ if(action==='attachment-complete'){
+  const id=attachmentId(body?.attachmentId);if(!id)return fail('Anexo inválido.');
+  const {data:a,error:e}=await db.from('clyriva_notice_attachments').select('id,storage_path,mime_type,size_bytes,state,notice_id,client_id')
+    .eq('id',id).eq('admin_id',uid).maybeSingle();
+  if(e)throw e;if(!a)return fail('Anexo não encontrado.',404);
+  if(a.state==='ready')return response({ok:true,attachmentId:id,alreadyReady:true});
+  if(!activeCompany(payload,a.client_id))return fail('Empresa não está mais ativa.',403);
+  const {data:blob,error:dErr}=await db.storage.from(DOC_BUCKET).download(a.storage_path);
+  if(dErr||!blob)return fail('Upload ainda não concluído. Tente novamente.',409);
+  const bytes=new Uint8Array(await blob.arrayBuffer());
+  if(bytes.length!==a.size_bytes||bytes.length>DOC_MAX||!validFileHeader(bytes,a.mime_type)){
+    await db.storage.from(DOC_BUCKET).remove([a.storage_path]);
+    await db.from('clyriva_notice_attachments').delete().eq('id',id).eq('admin_id',uid);
+    return fail('O documento enviado não corresponde ao tamanho ou formato informado.',400);
+  }
+  const {error:readyErr}=await db.from('clyriva_notice_attachments').update({state:'ready',updated_at:new Date().toISOString()}).eq('id',id).eq('admin_id',uid).eq('state','pending');
+  if(readyErr)throw readyErr;
+  return response({ok:true,attachmentId:id});
+ }
+ if(action==='attachment-remove'){
+  const id=attachmentId(body?.attachmentId);if(!id)return fail('Anexo inválido.');
+  const {data:a,error:e}=await db.from('clyriva_notice_attachments').select('id,storage_path').eq('id',id).eq('admin_id',uid).maybeSingle();
+  if(e)throw e;if(!a)return fail('Anexo não encontrado.',404);
+  const {error:removeError}=await db.storage.from(DOC_BUCKET).remove([a.storage_path]);
+  if(removeError)return fail('Não foi possível excluir o arquivo do armazenamento.',503);
+  const {error:deleteError}=await db.from('clyriva_notice_attachments').delete().eq('id',id).eq('admin_id',uid);
+  if(deleteError)throw deleteError;
+  return response({ok:true});
+ }
+ if(action==='notify-notice'){
+  const id=attachmentId(body?.noticeId);if(!id)return fail('Aviso inválido.');
+  const {data:n,error:e}=await db.from('clyriva_client_notices').select('client_id,status').eq('id',id).eq('admin_id',uid).maybeSingle();
+  if(e)throw e;if(!n||n.status!=='active'||!activeCompany(payload,n.client_id))return fail('Aviso indisponível.',404);
+  let sent=0;try{sent=await sendNewNotice(uid,n.client_id);}catch{sent=0;}
+  return response({ok:true,pushSent:sent});
+ }
  if(action==='list'){
   const {data:grants,error:e1}=await db.from('clyriva_client_access').select('client_id,email,enabled,created_at,last_password_reset_at,user_id').eq('admin_id',uid).order('created_at',{ascending:false}).limit(300);
   const users=[...new Set((grants||[]).filter(x=>x.enabled&&x.user_id).map(x=>x.user_id))];
@@ -91,7 +199,7 @@ async function adminHandler(uid:string,action:string,body:any){
    if(e3)throw e3;
    for(const entry of logs||[])if(!last.has(entry.notice_id))last.set(entry.notice_id,{date:entry.delivery_date,daysBefore:entry.days_before,at:entry.sent_at});
   }
-  return response({ok:true,companies:customers.map((x:any)=>({id:x.id,name:x.name,status:x.status})).filter((x:any)=>x.id),grants:publicGrants,notices:(notices||[]).map(n=>({...n,last_delivery:last.get(n.id)||null}))});
+  return response({ok:true,companies:customers.map((x:any)=>({id:x.id,name:x.name,status:x.status})).filter((x:any)=>x.id),grants:publicGrants,notices:(notices||[]).map(n=>({...n,last_delivery:last.get(n.id)||null})),attachments:await attachmentList((notices||[]).map(n=>n.id))});
  }
  if(action==='revoke'){
   const email=String(body?.email||'').trim().toLowerCase();if(!clientId||!emailValid(email))return fail('Empresa ou e-mail inválido.');
@@ -200,13 +308,14 @@ async function adminHandler(uid:string,action:string,body:any){
 }
 async function clientHandler(uid:string,action:string,body:any){
  const scope=await activeGrants(uid);if(!scope.length)return fail('Nenhuma empresa autorizada para esta conta. Fale com a gestão.',403);
+ if(action==='attachment-link')return await attachmentLink(uid,body,false);
  if(action==='list'){
    const admins=[...new Set(scope.map(x=>x.admin_id))];
    const allowed=new Set(scope.map(x=>x.admin_id+'|'+x.client_id));
    const {data,error:e}=await db.from('clyriva_client_notices').select('id,admin_id,client_id,title,body,due_date,created_at,status,notice_type,amount_cents,reminder_enabled,paid_at').in('status',['active','paid']).in('admin_id',admins).in('client_id',[...new Set(scope.map(x=>x.client_id))]).order('created_at',{ascending:false}).limit(400);
    if(e)throw e;
    const notices=(data||[]).filter(x=>allowed.has(x.admin_id+'|'+x.client_id));
-   return response({ok:true,companies:scope,notices});
+   return response({ok:true,companies:scope,notices,attachments:await attachmentList(notices.map(n=>n.id))});
  }
  if(action==='subscribe'){
   const sub=body?.subscription;if(!subscriptionValid(sub))return fail('Assinatura inválida.');

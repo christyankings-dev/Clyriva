@@ -3,8 +3,8 @@
 const $=s=>document.querySelector(s),cfg=window.CLYRIVA_CONFIG||{};
 const client=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{autoRefreshToken:true,persistSession:true}});
 const base=cfg.supabaseUrl+'/functions/v1/clyriva-client';
-let state={companies:[],grants:[],notices:[]},busy=false;
-function wipeAdminPage(){state={companies:[],grants:[],notices:[]};const area=$('#admin-workspace');if(area)area.classList.add('hidden');const loading=$('#admin-loading');if(loading){loading.classList.remove('hidden');loading.textContent='Sessão encerrada. Entre novamente pelo painel administrativo.';}for(const id of ['#invite-result','#access-list','#notices-list','#billing-summary']){const slot=$(id);if(slot)slot.replaceChildren();}for(const id of ['#invite-form','#notice-form','#charge-form']){const form=$(id);if(form)form.reset();}}
+let state={companies:[],grants:[],notices:[],attachments:[]},busy=false;
+function wipeAdminPage(){state={companies:[],grants:[],notices:[],attachments:[]};const area=$('#admin-workspace');if(area)area.classList.add('hidden');const loading=$('#admin-loading');if(loading){loading.classList.remove('hidden');loading.textContent='Sessão encerrada. Entre novamente pelo painel administrativo.';}for(const id of ['#invite-result','#access-list','#notices-list','#billing-summary']){const slot=$(id);if(slot)slot.replaceChildren();}for(const id of ['#invite-form','#notice-form','#charge-form']){const form=$(id);if(form)form.reset();}}
 const status=(sel,msg,err=false)=>{const el=$(sel);if(el){el.textContent=msg;el.classList.toggle('error',err);}};
 function el(tag,text,className){const node=document.createElement(tag);if(text!=null)node.textContent=String(text);if(className)node.className=className;return node;}
 function fmtDate(v){return v?String(v).slice(8,10)+'/'+String(v).slice(5,7)+'/'+String(v).slice(0,4):'Sem prazo';}
@@ -20,6 +20,56 @@ async function api(action,data={}){
  let value={};try{value=await res.json();}catch{};if(!res.ok||!value.ok)throw Error(value.error||'Falha na operação.');return value;
 }
 function company(id){return state.companies.find(c=>c.id===id)?.name||'Empresa removida';}
+const DOC_MAX=5*1024*1024;
+const DOC_MIMES=['application/pdf','image/jpeg','image/png'];
+function fileError(file){
+ if(!file)return 'Escolha um arquivo.';
+ if(file.size<1||file.size>DOC_MAX)return 'O arquivo precisa ter até 5 MB.';
+ if(!DOC_MIMES.includes(file.type))return 'Apenas PDF, JPG e PNG são aceitos.';
+ return null;
+}
+async function uploadAttachment(noticeId,file){
+ const issue=fileError(file);if(issue)throw Error(issue);
+ const start=await api('attachment-start',{noticeId,fileName:file.name,mimeType:file.type,sizeBytes:file.size});
+ const result=await client.storage.from('clyriva-client-attachments')
+   .uploadToSignedUrl(start.path,start.token,file,{contentType:file.type,upsert:false});
+ if(result.error)throw Error('O documento não foi enviado. '+result.error.message);
+ await api('attachment-complete',{attachmentId:start.attachmentId});
+ return start.attachmentId;
+}
+function attachmentsFor(id){return state.attachments.filter(a=>a.notice_id===id);}
+async function openAttachment(id,download=false){
+ const tab=window.open('about:blank','_blank');
+ try{const doc=await api('attachment-link',{attachmentId:id,download});
+  if(tab){tab.opener=null;tab.location.replace(doc.url);}else window.location.assign(doc.url);
+ }catch(e){if(tab)tab.close();status('#admin-feedback',e.message,true);}
+}
+function attachmentBlock(notice){
+ const block=el('div',null,'document-list');const files=attachmentsFor(notice.id);
+ block.append(el('strong',files.length?'Documentos anexados ('+files.length+')':'Sem documento anexado','document-title'));
+ for(const f of files){
+  const row=el('div',null,'document-row');row.append(el('span','📎 '+f.original_name+' · '+(f.size_bytes/1024).toFixed(0)+' KB','document-name'));
+  const view=el('button','Visualizar','btn');view.type='button';view.onclick=()=>openAttachment(f.id);row.append(view);
+  const download=el('button','Baixar','btn');download.type='button';download.onclick=()=>openAttachment(f.id,true);row.append(download);
+  const remove=el('button','Remover','btn');remove.type='button';remove.onclick=async()=>{
+   if(!confirm('Remover permanentemente o anexo '+f.original_name+'?'))return;
+   remove.disabled=true;
+   try{await api('attachment-remove',{attachmentId:f.id});await refresh();status('#admin-feedback','Anexo removido.');}
+   catch(e){status('#admin-feedback',e.message,true);}finally{remove.disabled=false;}
+  };row.append(remove);block.append(row);
+ }
+ if(notice.status!=='archived'){
+  const picker=el('input');picker.type='file';picker.accept='.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png';picker.className='hidden';
+  const b=el('button','+ Adicionar documento','btn');b.type='button';b.onclick=()=>picker.click();
+  picker.addEventListener('change',async()=>{const file=picker.files?.[0];if(!file)return;
+   b.disabled=true;status('#admin-feedback','Enviando '+file.name+'…');
+   try{await uploadAttachment(notice.id,file);await refresh();status('#admin-feedback','Anexo privado disponível para o cliente.');}
+   catch(e){status('#admin-feedback',e.message,true);}finally{b.disabled=false;picker.value='';}
+  });block.append(b,picker);
+ }
+ return block;
+}
+
 function render(){
  const active=state.companies.filter(x=>x.status!=='inactive');
  for(const select of document.querySelectorAll('.company-select')){
@@ -95,6 +145,7 @@ function render(){
      archive.disabled=true;try{await api('archive',{noticeId:n.id});await refresh();}catch(e){status('#admin-feedback',e.message,true);}finally{archive.disabled=false;}
    });card.append(archive);
   }
+  card.append(attachmentBlock(n));
   notices.append(card);
  }
 
@@ -112,13 +163,23 @@ function exportCharges(){
  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);
  status('#admin-feedback','Relatório CSV de cobranças gerado. Guarde o arquivo em local seguro.');
 }
-async function refresh(){const res=await api('list');state={companies:res.companies||[],grants:res.grants||[],notices:res.notices||[]};render();$('#admin-loading').classList.add('hidden');$('#admin-workspace').classList.remove('hidden');if(!state.companies.length)status('#admin-feedback','Cadastre e salve sua primeira empresa no painel antes de publicar avisos.');}
+async function refresh(){const res=await api('list');state={companies:res.companies||[],grants:res.grants||[],notices:res.notices||[],attachments:res.attachments||[]};render();$('#admin-loading').classList.add('hidden');$('#admin-workspace').classList.remove('hidden');if(!state.companies.length)status('#admin-feedback','Cadastre e salve sua primeira empresa no painel antes de publicar avisos.');}
 async function createCharge(e){e.preventDefault();if(busy)return;busy=true;const f=e.target,b=$('#charge-submit');b.disabled=true;
  try{const payload=Object.fromEntries(new FormData(f));payload.clientId=f.elements.clientId.value;
   const isEdit=!!f.dataset.editId;if(isEdit)payload.noticeId=f.dataset.editId;
   if(!isEdit){if(!f.dataset.requestKey)f.dataset.requestKey=crypto.randomUUID?.()||('10000000-0000-4000-a000-'+String(Date.now()).slice(-12));payload.requestKey=f.dataset.requestKey;}
+  const file=f.querySelector('#charge-attachment')?.files?.[0];if(file){const issue=fileError(file);if(issue)throw Error(issue);}
   const result=await api(isEdit?'update-charge':'create-charge',payload);
-  resetChargeForm();await refresh();status('#charge-feedback',isEdit?'Cobrança atualizada. Próximos lembretes usarão os dados corrigidos.':result.alreadyExists?'Cadastro anterior confirmado. A cobrança não foi duplicada.':'Cobrança cadastrada. Serão enviados avisos no D-3, D-2, D-1 e vencimento, conforme o prazo.');
+  if(file){try{await uploadAttachment(result.noticeId||payload.noticeId,file);}catch(error){
+   // Nunca duplicar cobrança quando o upload falhar. A edição retoma o registro já salvo.
+   f.dataset.editId=result.noticeId||payload.noticeId;
+   f.elements.clientId.disabled=true;
+   $('#charge-heading').textContent='Anexar documento à cobrança já salva';
+   $('#charge-submit').textContent='Tentar enviar o anexo novamente';
+   $('#charge-cancel-edit').classList.remove('hidden');
+   await refresh();throw Error('Cobrança salva, mas o anexo falhou: '+error.message+'. Você pode tentar novamente.');
+  }}
+  resetChargeForm();await refresh();status('#charge-feedback',(file?'Documento anexado com segurança. ':'')+(isEdit?'Cobrança atualizada. Próximos lembretes usarão os dados corrigidos.':result.alreadyExists?'Cadastro anterior confirmado. A cobrança não foi duplicada.':'Cobrança cadastrada. Serão enviados avisos no D-3, D-2, D-1 e vencimento, conforme o prazo.'));
  }catch(err){status('#charge-feedback',err.message,true);}finally{busy=false;b.disabled=false;}
 }
 function temporaryAccess(email,secret,url,created=true){
@@ -148,8 +209,14 @@ temporaryAccess(value.email,value.temporaryPassword,value.loginUrl,value.created
  }catch(err){status('#invite-result',err.message,true);}finally{busy=false;b.disabled=false;}
 }
 async function publish(e){e.preventDefault();if(busy)return;busy=true;const form=e.target,b=form.querySelector('button[type="submit"]');b.disabled=true;
- try{const data=Object.fromEntries(new FormData(form));data.notify=form.elements.notify.checked;
-  const result=await api('publish',data);status('#admin-feedback','Aviso publicado. Notificações aceitas pelo serviço: '+result.pushSent+'. A entrega depende do celular.');form.reset();await refresh();
+ try{const data=Object.fromEntries(new FormData(form));const file=form.querySelector('#notice-attachment')?.files?.[0];
+  if(file){const issue=fileError(file);if(issue)throw Error(issue);}
+  const wantsNotify=form.elements.notify.checked;data.notify=wantsNotify&&!file;
+  const result=await api('publish',data);let sent=result.pushSent||0;
+  if(file){try{await uploadAttachment(result.noticeId,file);}catch(e){form.reset();await refresh();throw Error('Comunicado publicado, mas arquivo não enviado: '+e.message+'. Use “Adicionar documento” no comunicado salvo. O formulário foi limpo para evitar duplicação.');}
+   if(wantsNotify){const n=await api('notify-notice',{noticeId:result.noticeId});sent=n.pushSent||0;}
+  }
+  status('#admin-feedback','Aviso publicado'+(file?' com documento':'')+'. Notificações aceitas pelo serviço: '+sent+'. A entrega depende do celular.');form.reset();await refresh();
  }catch(err){status('#admin-feedback',err.message,true);}finally{busy=false;b.disabled=false;}
 }
 async function init(){

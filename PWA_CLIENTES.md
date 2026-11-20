@@ -58,3 +58,13 @@ A tela administrativa agora possui indicadores, filtros por empresa e situação
 No celular, os valores aparecem nas notificações **somente com marcação expressa** da opção. A preferência por dispositivo é restaurada ao entrar. O app possui filtros de pendentes e pagos e formulário de troca de senha.
 
 Testes físicos de entrega devem ser feitos com o primeiro cliente: instalar o app, autorizar notificações e acionar o botão de teste.
+
+## v2.3 — Documentos de cobranças e comunicados
+
+No painel `/avisos-admin.html`, selecione a empresa, cadastre uma cobrança (DAS, boleto, DARF, etc.), informe valor e vencimento e, opcionalmente, escolha um documento PDF/JPG/PNG de até 5 MB. Os lembretes D-3, D-2, D-1 e D0 continuam independentes da existência de anexo. O anexo pode ser enviado no cadastro, ou adicionado e removido depois, na lista de registros. O comunicado avulso também aceita documento.
+
+O cliente entra em `/cliente.html` com sua conta autorizada e vê os documentos do aviso apenas após o upload ser confirmado. Os botões Visualizar/Baixar chamam a função autenticada para emitir um link temporário (60 segundos); não há bucket público nem links permanentes. Documentos não são enviados dentro da notificação. Links assinados podem ser usados por quem os receber durante seu curto prazo de validade: evite compartilhá-los.
+
+Os arquivos ficam no bucket privado `clyriva-client-attachments`, com limite 5 MB e formatos PDF/JPEG/PNG. O servidor verifica os primeiros bytes do arquivo no fechamento do upload; isto **não substitui antivírus**. O sistema não armazena arquivos em cache offline. Ao sair, o cliente perde acesso a novos links; a revogação não invalida um link previamente assinado até expirar.
+
+Upload e consumo reais requerem uma conta administrativa e um cliente de teste, e ainda não puderam ser realizados por falta de cadastros de clientes na produção. Para o primeiro teste, faça upload de um PDF fictício, abra no app e tente acessar com login de outra empresa.

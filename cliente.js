@@ -18,7 +18,13 @@ async function api(action,data={}){
 }
 function money(cents){return 'R$ '+(Number(cents)/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function daysRemaining(iso){if(!iso)return null;const d=Date.UTC(...iso.split('-').map((v,i)=>i===1?Number(v)-1:Number(v)));const now=new Intl.DateTimeFormat('en-US',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()),get=k=>Number(now.find(v=>v.type===k)?.value||0),today=Date.UTC(get('year'),get('month')-1,get('day'));return Math.round((d-today)/86400000);}
-function noticeCard(n,company){
+async function openDocument(id,download=false){
+ const tab=window.open('about:blank','_blank');
+ try{const result=await api('client-attachment-link',{attachmentId:id,download});
+  if(tab){tab.opener=null;tab.location.replace(result.url);}else window.location.assign(result.url);
+ }catch(error){if(tab)tab.close();status('#client-feedback',error.message||'Documento indisponível.',true);}
+}
+function noticeCard(n,company,attachments=[]){
  const card=document.createElement('article');card.className='notice-card';
  const head=document.createElement('div');head.className='between';
  const title=document.createElement('h3');title.textContent=(n.reminder_enabled?(n.notice_type+' · '):'')+n.title;head.append(title);
@@ -29,7 +35,17 @@ function noticeCard(n,company){
  if(n.reminder_enabled&&n.amount_cents!=null){const moneyTag=document.createElement('strong');moneyTag.className='bill-amount';moneyTag.textContent=money(n.amount_cents);card.append(moneyTag);}
  card.append(msg);
  const meta=document.createElement('div');meta.className='meta';meta.textContent=company+(n.due_date?' · Vencimento: '+safeDate(n.due_date):'')+' · Publicado em '+new Date(n.created_at).toLocaleDateString('pt-BR');
- card.append(meta);return card;
+ card.append(meta);
+ if(attachments.length){const block=document.createElement('div');block.className='document-list';
+  const label=document.createElement('strong');label.className='document-title';label.textContent=attachments.length===1?'Guia ou documento anexo':'Documentos anexados';block.append(label);
+  for(const a of attachments){const line=document.createElement('div');line.className='document-row';
+   const name=document.createElement('span');name.className='document-name';name.textContent='📎 '+a.original_name;line.append(name);
+   for(const [title,download] of [['Visualizar',false],['Baixar',true]]){
+    const button=document.createElement('button');button.type='button';button.className='btn';button.textContent=title;
+    button.addEventListener('click',()=>openDocument(a.id,download));line.append(button);
+   }block.append(line);
+  }card.append(block);
+ }return card;
 }
 
 async function refreshPushPreference(){
@@ -54,7 +70,7 @@ async function refresh(){
  const next3=pending.filter(n=>{const days=daysRemaining(n.due_date);return days>=0&&days<=3;});
  const overview=$('#client-billing-overview');if(overview){overview.replaceChildren();for(const [label,number] of [['Em aberto',pending.length],['Próximos 3 dias',next3.length],['Vencidos',overdue.length],['Pagos',notices.filter(n=>n.status==='paid').length]]){const item=document.createElement('div');item.className='summary-item';const num=document.createElement('strong');num.textContent=String(number);const txt=document.createElement('span');txt.textContent=label;item.append(num,txt);overview.append(item);}}
  if(!localItems.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='Nenhum aviso publicado para sua empresa até o momento.';area.append(empty);}
- else for(const notice of localItems)area.append(noticeCard(notice,byClient.get(notice.admin_id+'|'+notice.client_id)||'Sua empresa'));
+ else for(const notice of localItems)area.append(noticeCard(notice,byClient.get(notice.admin_id+'|'+notice.client_id)||'Sua empresa',(data.attachments||[]).filter(a=>a.notice_id===notice.id)));
  status('#client-feedback',`${(data.companies||[]).length} empresa(s) autorizada(s) · ${notices.length} aviso(s).`);
  loaded=true;view(true);refreshPushPreference();
 }
