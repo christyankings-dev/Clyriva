@@ -50,3 +50,11 @@ Cada disparo e registrado pela combinacao **endpoint + cobranca + dia do envio**
 O aplicativo fica associado exclusivamente a cada login de cliente e suas empresas autorizadas. Requer autorizacao explicita do cliente para receber notificacoes. Para verificar a entrega real, cadastra-se uma cobranca ficticia com vencimento em ate tres dias em uma empresa com cliente autenticado e aparelho inscrito e aguarda-se o cron ou um disparo manual autorizado. O servidor e o gateway podem aceitar uma notificacao sem que o telefone a apresente (sem conexao, bateria, bloqueio, permissao etc.).
 
 O registro do ultimo lembrete aceito pelo gateway fica visivel no painel do administrador, mas nao comprova entrega ao dispositivo fisico. Em caso de baixa equivocada, utilize **Reabrir cobrança**. Por privacidade, inscricoes antigas permanecem sem valores em pushes ate o cliente ativar novamente e optar pela exibicao do valor.
+
+## v2.2 — auditoria e confiabilidade
+
+A tela administrativa agora possui indicadores, filtros por empresa e situação, acompanhamento de aparelhos inscritos, redefinição de acesso e exportação das cobranças em CSV. Cada envio é registrado por cobrança, dispositivo e data. Tentativas pendentes podem ser retomadas após 15 minutos, mantendo o bloqueio de envios marcados como concluídos. Antes de enviar, a cobrança é novamente conferida para não notificar pagamentos quitados.
+
+No celular, os valores aparecem nas notificações **somente com marcação expressa** da opção. A preferência por dispositivo é restaurada ao entrar. O app possui filtros de pendentes e pagos e formulário de troca de senha.
+
+Testes físicos de entrega devem ser feitos com o primeiro cliente: instalar o app, autorizar notificações e acionar o botão de teste.

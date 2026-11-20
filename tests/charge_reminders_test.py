@@ -42,6 +42,6 @@ class ChargeRemindersTests(unittest.TestCase):
         self.assertIn(".eq('reminder_enabled',true)",code)
         self.assertIn(".eq('status','active')",code)
         self.assertIn(".insert({endpoint:sub.endpoint,notice_id:notice.id,delivery_date:today",code)
-        self.assertIn('reminderText(notice,stage',code)
+        self.assertIn('reminderText(current,stage',code)
         self.assertNotIn('if(sub.last_sent_on===day)continue',code)
 if __name__=='__main__':unittest.main()

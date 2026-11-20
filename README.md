@@ -1,3 +1,5 @@
+> **Novidade (20/11/2026):** v2.2 — auditoria de segurança e lembretes, painel de vencimentos, dispositivos inscritos, CSV e recuperação de acessos. Consulte [CHANGELOG_v2.2.md](CHANGELOG_v2.2.md).
+
 # Clyriva — Gestão privada v1.7
 
 Aplicação **privada** de gestão contábil e financeira. O login individual é obrigatório; **clientes não entram no sistema**. O administrador atende os clientes diretamente e utiliza o painel para encontrar informações e gerar relatórios. Um futuro sócio poderá ter usuário próprio, com escopo compartilhado e permissões a desenvolver.

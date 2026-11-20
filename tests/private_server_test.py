@@ -26,7 +26,7 @@ class PrivateServerTests(unittest.TestCase):
             status,heads,body=self.call(path='/')
             self.assertEqual(status,200)
             self.assertIn('Strict-Transport-Security',heads)
-            self.assertIn('Content-Security-Policy-Report-Only',heads)
+            self.assertIn('Content-Security-Policy',heads)
             status,heads,body=self.call(method='HEAD')
             self.assertEqual(status,200);self.assertEqual(body,b'')
 
