@@ -15,7 +15,7 @@ alter table public.clyriva_client_notices add constraint clyriva_notice_amount_c
 alter table public.clyriva_client_notices add constraint clyriva_notice_reminder_check
  check(not reminder_enabled or (due_date is not null and amount_cents is not null and notice_type<>'Aviso'));
 alter table public.clyriva_client_push_subscriptions
- add column if not exists show_amount boolean not null default true;
+ add column if not exists show_amount boolean not null default false;
 create table if not exists public.clyriva_client_push_deliveries(
  endpoint text not null references public.clyriva_client_push_subscriptions(endpoint) on delete cascade,
  notice_id uuid not null references public.clyriva_client_notices(id) on delete cascade,

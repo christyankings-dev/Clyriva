@@ -44,6 +44,13 @@ function render(){
   top.append(el('strong',(bill?(n.notice_type+' · '):'')+n.title),el('span',label,n.status==='paid'?'pill':'meta'));
   card.append(top,el('p',n.body));
   card.append(el('div',company(n.client_id)+' · Vencimento: '+fmtDate(n.due_date)+(bill?' · '+fmtMoney(n.amount_cents):''),'meta'));
+  if(bill){card.append(el('div',n.last_delivery?('Último lembrete aceito pelo serviço: '+fmtDate(n.last_delivery.date)+' (D-'+n.last_delivery.daysBefore+').'):('Lembretes ainda não enviados para dispositivo inscrito.'),'meta'));}
+  if(bill&&n.status==='paid'){
+   const reopen=el('button','Reabrir cobrança','btn');reopen.type='button';reopen.addEventListener('click',async()=>{
+    if(!confirm('Reabrir esta cobrança? Ela voltará a enviar lembretes nos dias devidos.'))return;
+    reopen.disabled=true;try{await api('reopen-charge',{noticeId:n.id});status('#admin-feedback','Cobrança reaberta. Lembretes futuros retomados.');await refresh();}catch(e){status('#admin-feedback',e.message,true);}finally{reopen.disabled=false;}
+   });card.append(reopen);
+  }
   if(bill&&n.status==='active'){
    const edit=el('button','Editar cobrança','btn');edit.type='button';edit.addEventListener('click',()=>editCharge(n));card.append(edit);
    const paid=el('button','Marcar como pago','btn');paid.type='button';paid.style.margin='8px';paid.addEventListener('click',async()=>{

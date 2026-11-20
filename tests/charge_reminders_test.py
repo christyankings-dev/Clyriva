@@ -18,6 +18,7 @@ class ChargeRemindersTests(unittest.TestCase):
         js=(ROOT/'avisos-admin.js').read_text()
         self.assertIn("api(isEdit?'update-charge':'create-charge'",js)
         self.assertIn("api('mark-paid'",js)
+        self.assertIn("api('reopen-charge'",js)
         self.assertIn("api('archive'",js)
     def test_client_opt_in_and_amount(self):
         status,data,*_=servidor.resource('/cliente.html','127.0.0.1')

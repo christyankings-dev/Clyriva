@@ -28,6 +28,7 @@ window.fetch=async function(url,opts={}){
    const rec=window.__fakeNotices.find(x=>x.id===b.noticeId);Object.assign(rec,{notice_type:b.noticeType,title:b.title,body:b.message||'Nova cobrança',due_date:b.dueDate,amount_cents:9250});
  }
  if(action==='mark-paid'){window.__fakeNotices.find(x=>x.id===b.noticeId).status='paid';}
+ if(action==='reopen-charge'){window.__fakeNotices.find(x=>x.id===b.noticeId).status='active';}
  if(action==='archive'){window.__fakeNotices.find(x=>x.id===b.noticeId).status='archived';}
  }else if(type==='client'){
  if(action==='list')out={ok:true,companies:[{admin_id:'admin1',client_id:'empresa1',company:'Empresa Exemplo MEI'}],notices:[{id:'x',admin_id:'admin1',client_id:'empresa1',notice_type:'DAS',title:'DAS novembro',body:'Guia DAS disponível',due_date:'2026-11-23',amount_cents:8250,status:'active',reminder_enabled:true,created_at:'2026-11-19T12:00:00Z'},{id:'y',admin_id:'admin1',client_id:'empresa1',notice_type:'Boleto',title:'Boleto honorários',body:'Registrado',due_date:'2026-11-25',amount_cents:9950,status:'paid',reminder_enabled:true,created_at:'2026-11-19T12:00:00Z'}]};
@@ -74,6 +75,9 @@ try:
    page.get_by_role('button',name='Marcar como pago').click()
    page.get_by_text('Pago',exact=True).wait_for(timeout=6000)
    check(label+' marcar como pago',page.get_by_text('Pago',exact=True).count()>=1)
+   page.get_by_role('button',name='Reabrir cobrança').click()
+   page.get_by_role('button',name='Marcar como pago').wait_for(timeout=6000)
+   check(label+' reabrir',page.get_by_role('button',name='Marcar como pago').count()==1)
    check(label+' sem JS errors',not errs)
    page.close();page=ctx.new_page();errs=[]
    page.on('pageerror',lambda e:errs.append(str(e)))
