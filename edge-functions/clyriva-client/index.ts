@@ -151,8 +151,9 @@ async function internalDocuments(uid:string,action:string,body:any,payload:any){
     status:isTax?(source.status==='paid'?'paid':'active'):(source.status==='done'?'archived':'active'),
     notice_type:kind,reminder_enabled:isTax,amount_cents:isTax?parseBrlCents(source.value):null,
     updated_at:new Date().toISOString()};
-  const {data:found,error:lookupError}=await db.from('clyriva_client_notices').select('id,status').eq('admin_id',uid).eq('source_type',owner.type).eq('source_id',owner.id).maybeSingle();
+  const {data:found,error:lookupError}=await db.from('clyriva_client_notices').select('id,status,client_id').eq('admin_id',uid).eq('source_type',owner.type).eq('source_id',owner.id).maybeSingle();
   if(lookupError)throw lookupError;
+  if(found&&found.client_id!==owner.clientId)return fail('Registro publicado para outra empresa. Arquive o aviso anterior antes de mudar a empresa.',409);
   if(action==='internal-sync'&&!found)return response({ok:true,skipped:true});
   // Respeita a opção de arquivar no app: edições administrativas não republicam
   // automaticamente comunicados que foram ocultados do cliente.
