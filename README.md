@@ -33,7 +33,7 @@ O cofre usa AES-GCM e senha-mestra. O JSON de backup contém dados legíveis da 
 
 ## Execução e implantação
 
-Para iniciar o servidor, execute `python servidor.py` e abra `http://127.0.0.1:8765`. O login online requer uma conta autorizada no Supabase configurado. Em produção, o Railway usa o Dockerfile, HTTPS e `CLYRIVA_ENV=production`. O arquivo `config.js` recebe apenas URL e chave pública. Migrações do banco e funções Edge têm implantação separada do site.
+Para iniciar o servidor, execute `python servidor.py` e abra `http://127.0.0.1:8765`. O login online requer uma conta autorizada no Supabase configurado. O Railway acompanha `main`, com build e comando do Gunicorn em `railway.json`. Para rodar pelo Dockerfile, a imagem já define `CLYRIVA_ENV=production`. O arquivo `config.js` recebe apenas URL e chave pública. Migrações do banco e funções Edge têm implantação separada do site.
 
 O workflow de qualidade verifica regras da carteira, proxy, lembretes, interface em Chromium e integração com um Supabase descartável. A suíte de integração usa Docker e Supabase CLI. O script `bash tests/run_supabase_local.sh` cria seu próprio projeto local temporário e usa apenas a API do loopback.
 

@@ -79,8 +79,6 @@ def main():
     else:
         raise AssertionError("A função local não iniciou.")
     admin_id, admin, _ = user("gestor")
-    a_id, alice, a_mail = user("cliente-a")
-    b_id, bob, b_mail = user("cliente-b")
     insert("clyriva_admins", {"user_id":admin_id})
     a, b, tax, task = "empresa-aurora", "empresa-brisa", "guia-aurora", "tarefa-brisa"
     w = {"version":1, "clients":[{"id":a,"name":"Aurora MEI","status":"active"},{"id":b,"name":"Brisa MEI","status":"active"}],
@@ -94,8 +92,15 @@ def main():
         nonlocal rev
         rev = rpc("clyriva_commit", admin, {"p_workspace":w,"p_expected":rev,"p_vault":None})
     save()
-    for company, uid, email in [(a,a_id,a_mail),(b,b_id,b_mail)]:
-        insert("clyriva_client_access",{"admin_id":admin_id,"client_id":company,"user_id":uid,"email":email,"enabled":True})
+    def invite(company,email):
+        invitation=op("admin-invite",admin,{"clientId":company,"email":email})
+        assert invitation["created"]
+        session=request("POST","/auth/v1/token?grant_type=password",ANON,
+                        {"email":email,"password":invitation["temporaryPassword"]})
+        return session["access_token"]
+    alice=invite(a,"cliente-a@example.test")
+    b_mail="cliente-b@example.test"
+    bob=invite(b,b_mail)
     assert rpc("clyriva_load", alice) is None
     for actor in (alice, ANON):
         rpc("clyriva_commit", actor, {"p_expected":0,"p_workspace":w,"p_vault":None}, (401,403))
