@@ -25,3 +25,9 @@ Anexar não envia automaticamente o documento ao cliente. A publicação requer 
 
 ## Limitações e próximos testes
 Para validar upload e download realmente concluídos, falta um acesso de cliente de teste e uma cobrança de teste publicada, com permissão real no dispositivo. É necessário verificar separação entre duas empresas, atualização de anexos já publicados e entrega real da notificação. Não foi cadastrado cliente de teste nem modificada nenhuma obrigação real na execução da auditoria.
+
+## Ajustes adicionais da revisão final
+- Excluir um anexo interno também exclui a cópia do mesmo arquivo publicada para o cliente, impedindo documentos antigos de continuarem disponíveis por engano.
+- Atualização de lançamento já publicado respeita o arquivamento escolhido na área do cliente e preserva mensagens editadas ali.
+- Observações internas das fichas de empresas **não são copiadas automaticamente** para o aplicativo. O comunicado publicado recebe uma descrição neutra, que pode ser personalizada na área de avisos.
+- Testes de regressão específicos: 13 verificações de integração e isolamento.

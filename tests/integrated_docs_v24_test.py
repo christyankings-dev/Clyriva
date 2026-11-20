@@ -41,6 +41,14 @@ class InternalDocsTest(unittest.TestCase):
   self.assertIn("source.status==='done'?'archived':'active'",edge)
   self.assertIn("internalDocsApi('unpublish'",panel)
   self.assertIn("if(internalEntity(payload,kind,entityId))return fail",edge)
+ def test_deleting_internal_file_removes_published_copies(self):
+  self.assertIn(".eq('source_attachment_id',id)",edge)
+  self.assertIn("Falha ao remover as cópias publicadas",edge)
+ def test_archived_notice_not_automatically_republished(self):
+  self.assertIn("found?.status==='archived'",edge)
+ def test_internal_notes_not_shared(self):
+  self.assertNotIn("String(source.notes||'')",edge)
+  self.assertIn("if(action==='internal-sync'&&found)delete data.body",edge)
  def test_only_one_vendor_script(self):
   self.assertEqual(html.count('src="vendor/supabase.js"'),1)
  def test_file_size_limit(self):

@@ -143,16 +143,21 @@ async function internalDocuments(uid:string,action:string,body:any,payload:any){
   const rawType=String(source.kind||'');
   const kind=isTax?(CHARGE_TYPES.includes(rawType)?rawType:'Guia'):'Aviso';
   const title=isTax?`${kind} · ${String(source.competence||'').slice(0,7)}${source.ref?' · '+String(source.ref).slice(0,35):''}`:String(source.title||'').slice(0,140);
-  const description=String(source.notes||'').trim().slice(0,1500)|| (isTax?'Cobrança cadastrada pela gestão. Consulte a guia e confira o vencimento.':'Pendência cadastrada pela gestão. Consulte os detalhes.');
+  // Observações da rotina administrativa podem ser confidenciais: nunca as copie automaticamente ao cliente.
+  const description=isTax?'Cobrança cadastrada pela gestão. Consulte a guia e confira o vencimento.':'Pendência cadastrada pela gestão. Consulte os detalhes.';
   const due=String(source.dueDate||'');
   if(title.length<3||(!validISODate(due)&&due)||isTax&&(!validISODate(due)||parseBrlCents(source.value)===null))return fail('Dados do registro inválidos para publicar. Confira título, data e valor.',400);
   const data:any={title,body:description,due_date:validISODate(due)?due:null,
     status:isTax?(source.status==='paid'?'paid':'active'):(source.status==='done'?'archived':'active'),
     notice_type:kind,reminder_enabled:isTax,amount_cents:isTax?parseBrlCents(source.value):null,
     updated_at:new Date().toISOString()};
-  const {data:found,error:lookupError}=await db.from('clyriva_client_notices').select('id').eq('admin_id',uid).eq('source_type',owner.type).eq('source_id',owner.id).maybeSingle();
+  const {data:found,error:lookupError}=await db.from('clyriva_client_notices').select('id,status').eq('admin_id',uid).eq('source_type',owner.type).eq('source_id',owner.id).maybeSingle();
   if(lookupError)throw lookupError;
   if(action==='internal-sync'&&!found)return response({ok:true,skipped:true});
+  // Respeita a opção de arquivar no app: edições administrativas não republicam
+  // automaticamente comunicados que foram ocultados do cliente.
+  if(action==='internal-sync'&&found?.status==='archived'&&data.status==='active')data.status='archived';
+  if(action==='internal-sync'&&found)delete data.body; // Preserva a mensagem editada na área de avisos.
   let noticeId=found?.id;
   if(noticeId){const {error:updateError}=await db.from('clyriva_client_notices').update(data).eq('id',noticeId).eq('admin_id',uid);if(updateError)throw updateError;}
   else{
@@ -243,6 +248,18 @@ async function internalDocuments(uid:string,action:string,body:any,payload:any){
   return response({ok:true,url:link.signedUrl,expiresIn:60});
  }
  if(action==='internal-remove'){
+  // Se já foi publicado para o cliente, remove também a cópia autorizada.
+  // Do contrário, a gestão poderia apagar a guia interna e deixá-la disponível
+  // inadvertidamente dentro do app do cliente.
+  const {data:copies,error:copyErr}=await db.from('clyriva_notice_attachments')
+    .select('id,storage_path').eq('admin_id',uid).eq('source_attachment_id',id).limit(20);
+  if(copyErr)throw copyErr;
+  if(copies?.length){
+    const {error:storedErr}=await db.storage.from(DOC_BUCKET).remove(copies.map(x=>x.storage_path));
+    if(storedErr)return fail('Falha ao remover as cópias publicadas do documento.',503);
+    const {error:cleanErr}=await db.from('clyriva_notice_attachments').delete().eq('admin_id',uid).in('id',copies.map(x=>x.id));
+    if(cleanErr)throw cleanErr;
+  }
   const {error:de}=await db.storage.from(DOC_BUCKET).remove([doc.storage_path]);if(de)return fail('Falha ao remover arquivo.',503);
   const {error:re}=await db.from(table).delete().eq('id',id).eq('admin_id',uid);if(re)throw re;
   return response({ok:true});
