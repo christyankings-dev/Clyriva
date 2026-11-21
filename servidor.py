@@ -29,7 +29,7 @@ ASSETS = {
     'core.js': 'text/javascript', 'app.js': 'text/javascript', 'file-demo.js': 'text/javascript',
     'panel.js': 'text/javascript', 'config.js': 'text/javascript', 'vendor/supabase.js': 'text/javascript',
     'panel.css': 'text/css', 'identity.css': 'text/css', 'rotina.css': 'text/css', 'rotina.js': 'text/javascript',
-    'pwa.css':'text/css', 'pwa.js':'text/javascript', 'sw.js':'text/javascript',
+    'pwa.css':'text/css', 'pwa.js':'text/javascript', 'sw.js':'text/javascript', 'push-test.js':'text/javascript',
     'offline.html':'text/html', 'manifest.webmanifest':'application/manifest+json',
     'cliente.html':'text/html', 'avisos-admin.html':'text/html',
     'cliente.css':'text/css', 'cliente.js':'text/javascript', 'avisos-admin.js':'text/javascript',

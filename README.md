@@ -12,7 +12,7 @@ O Clyriva reúne a carteira, os honorários, as notas fiscais de controle, o cai
 
 Na ficha de uma empresa ativa, selecione **Criar login do cliente**, confira a empresa, informe o e-mail da pessoa e copie o acesso para enviar em particular. Clientes já autorizados usam a senha existente. Para testar o perfil de cliente no seu celular, use um e-mail diferente do seu login administrativo.
 
-O cliente abre o link recebido, toca em **Instalar no celular**, abre o ícone **Clyriva Clientes** e entra com o e-mail e a senha. Em **Notificações neste aparelho**, toca em **Ativar notificações**, permite o envio e escolhe **Enviar notificação de teste**. O serviço informa se aceitou o teste. A exibição é conferida na central de notificações do próprio aparelho. No iPhone ou iPad, o Web Push requer iOS/iPadOS 16.4 ou posterior e o aplicativo adicionado à Tela de Início.
+O cliente abre o link recebido, toca em **Instalar no celular**, abre o ícone **Clyriva Clientes** e entra com o e-mail e a senha. Em **Notificações neste aparelho**, toca em **Ativar notificações**, permite o envio e escolhe **Enviar notificação de teste**. O app informa quando o serviço aceita o envio. Quando o navegador apresenta a notificação, o app mostra **Este aparelho confirmou** e o horário. O resultado do último teste fica disponível para a mesma conta nesse navegador por até 24 horas, inclusive ao reabrir o app. No iPhone ou iPad, o Web Push requer iOS/iPadOS 16.4 ou posterior e o aplicativo adicionado à Tela de Início.
 
 ## Rotina do escritório
 
