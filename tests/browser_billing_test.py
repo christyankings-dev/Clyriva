@@ -21,11 +21,11 @@ window.fetch=async function(url,opts={}){
  if(type==='admin'){
  if(action==='list')out={ok:true,companies:[{id:'empresa1',name:'Empresa Exemplo MEI',status:'active'}],grants:[],notices:window.__fakeNotices};
  if(action==='create-charge'){
-   window.__fakeNotices.unshift({id:'99999999-8888-7777-6666-555555555555',client_id:b.clientId,notice_type:b.noticeType,title:b.title,body:b.message||'Cobrança fictícia',due_date:b.dueDate,amount_cents:8250,reminder_enabled:true,status:'active'});
+   window.__fakeNotices.unshift({id:'99999999-8888-7777-6666-555555555555',client_id:b.clientId,notice_type:b.noticeType,title:b.title,body:b.message||'Cobrança fictícia',due_date:b.dueDate,amount_cents:Math.round(Number(b.amount)*100),reminder_enabled:true,status:'active'});
    out={ok:true};
  }
  if(action==='update-charge'){
-   const rec=window.__fakeNotices.find(x=>x.id===b.noticeId);Object.assign(rec,{notice_type:b.noticeType,title:b.title,body:b.message||'Nova cobrança',due_date:b.dueDate,amount_cents:9250});
+   const rec=window.__fakeNotices.find(x=>x.id===b.noticeId);Object.assign(rec,{notice_type:b.noticeType,title:b.title,body:b.message||'Nova cobrança',due_date:b.dueDate,amount_cents:Math.round(Number(b.amount)*100)});
  }
  if(action==='mark-paid'){window.__fakeNotices.find(x=>x.id===b.noticeId).status='paid';}
  if(action==='reopen-charge'){window.__fakeNotices.find(x=>x.id===b.noticeId).status='active';}
@@ -62,16 +62,18 @@ def run_suite():
     check(label+' prévia 4 dias',all(x in page.locator('#charge-preview').inner_text() for x in ['20/11/2026','21/11/2026','22/11/2026','23/11/2026','R$ 82,50']))
     page.locator('#charge-submit').click()
     page.wait_for_function('window.__fakeActions.some(a=>a.action==="create-charge")',timeout=6000)
-    page.get_by_text('DAS · DAS novembro 2026').wait_for(timeout=6000)
-    check(label+' cobrança salva',page.get_by_text('DAS · DAS novembro 2026').count()==1)
-    check(label+' valor na lista',page.get_by_text('R$ 82,50').count()>=1)
+    saved_charge=page.locator('#notices-list article').filter(has_text='DAS · DAS novembro 2026')
+    saved_charge.wait_for(timeout=6000)
+    check(label+' cobrança salva',saved_charge.count()==1)
+    check(label+' valor na lista',saved_charge.get_by_text('R$ 82,50').count()==1)
     page.get_by_role('button',name='Editar cobrança').click()
     check(label+' edição preenche',page.locator('#charge-form input[name="amount"]').input_value()=='82.50')
     page.locator('#charge-form input[name="amount"]').fill('92.50')
     page.locator('#charge-submit').click()
     page.wait_for_function('window.__fakeActions.some(a=>a.action==="update-charge")',timeout=6000)
-    page.get_by_text('R$ 92,50').wait_for(timeout=6000)
-    check(label+' edição salva',page.get_by_text('R$ 92,50').count()>=1)
+    updated_amount=saved_charge.get_by_text('R$ 92,50')
+    updated_amount.wait_for(timeout=6000)
+    check(label+' edição salva',updated_amount.count()==1)
     page.on('dialog',lambda dialog:dialog.accept())
     page.get_by_role('button',name='Marcar como pago').click()
     page.get_by_text('Pago',exact=True).wait_for(timeout=6000)
