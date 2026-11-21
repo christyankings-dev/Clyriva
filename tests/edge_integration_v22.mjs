@@ -1,17 +1,16 @@
 /* Simulacao isolada da Edge Function: API real executada contra Supabase e Web Push falsos.
    Nao abre rede, nao cria contas e nao acessa nenhum cliente real. */
 import {readFileSync} from 'node:fs';
-import {createRequire} from 'node:module';
+import {stripTypeScriptTypes} from 'node:module';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {dirname,resolve} from 'node:path';
 import crypto from 'node:crypto';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
-const require=createRequire(import.meta.url);
-const ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js');
 const rules=await import(pathToFileURL(resolve(root,'edge-functions/clyriva-client/reminder-text.mjs')));
-const code=ts.transpileModule(readFileSync(resolve(root,'edge-functions/clyriva-client/index.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
+const source=readFileSync(resolve(root,'edge-functions/clyriva-client/index.ts'),'utf8');
+const code=stripTypeScriptTypes(source.replace(/^import .*;$/gm,''));
 let handler=null;
 const today=rules.brazilDate(),due=new Date(Date.parse(today+'T00:00:00Z')+3*86400000).toISOString().slice(0,10);
 const state={devices:[{endpoint:'https://fcm.googleapis.com/fcm/send/fake-id-for-test',user_id:'client-1',enabled:true,p256dh:'a'.repeat(90),auth_secret:'b'.repeat(24),show_amount:false}],grants:[{admin_id:'admin-1',client_id:'empresa-a',email:'fake@example.test',user_id:'client-1',enabled:true}],workspaces:[{admin_id:'admin-1',payload:{clients:[{id:'empresa-a',name:'Empresa simulada',status:'active'}]}}],notices:[{id:'11111111-1111-4111-8111-111111111111',admin_id:'admin-1',client_id:'empresa-a',title:'DAS simulado',body:'Guia fiscal de teste',notice_type:'DAS',amount_cents:8250,due_date:due,status:'active',reminder_enabled:true}],deliveries:[],sent:[]};
@@ -49,9 +48,8 @@ class Query {
 }
 const client={from:(table)=>new Query(table),rpc:async()=>({data:{privateKey:'private-test-key',cronToken:'cron-test-token'},error:null}),auth:{getUser:async()=>({data:{user:null},error:null})}};
 const webpush={setVapidDetails:()=>{},sendNotification:async(_,payload)=>{state.sent.push(JSON.parse(payload));}};
-const fakeRequire=name=>name==='npm:@supabase/supabase-js@2.57.0'?{createClient:()=>client}:name==='npm:web-push@3.6.7'?{__esModule:true,default:webpush}:name==='./reminder-text.mjs'?rules:(()=>{throw Error('Unexpected import '+name)})();
-const context={require:fakeRequire,module:{exports:{}},exports:{},Deno:{env:{get:()=> 'placeholder'},serve:fn=>{handler=fn;}},console:{error:()=>{}},crypto:crypto.webcrypto,Request,Response,URL,Date,Intl,setTimeout};
-context.exports=context.module.exports;vm.runInNewContext(code,context,{timeout:2000});assert.equal(typeof handler,'function');
+const context={createClient:()=>client,webpush,...rules,Deno:{env:{get:()=> 'placeholder'},serve:fn=>{handler=fn;}},console:{error:()=>{}},crypto:crypto.webcrypto,Request,Response,URL,Date,Intl,setTimeout};
+vm.runInNewContext(code,context,{timeout:2000});assert.equal(typeof handler,'function');
 async function dispatch(secret='cron-test-token'){
  const res=await handler(new Request('https://example.supabase.co/functions/v1/clyriva-client/dispatch',{method:'POST',headers:{'x-clyriva-cron':secret,'content-type':'application/json'},body:'{}'}));
  return {status:res.status,...await res.json()};

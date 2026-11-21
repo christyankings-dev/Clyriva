@@ -1,50 +1,42 @@
-> **Novidade (20/11/2026):** v2.2 — auditoria de segurança e lembretes, painel de vencimentos, dispositivos inscritos, CSV e recuperação de acessos. Consulte [CHANGELOG_v2.2.md](CHANGELOG_v2.2.md).
+# Clyriva
 
-# Clyriva — Gestão privada v1.7
+O Clyriva reúne a carteira, os honorários, as notas fiscais de controle, o caixa, as guias e as pendências do escritório. A gestão e os clientes entram por páginas diferentes.
 
-Aplicação **privada** de gestão contábil e financeira. O login individual é obrigatório; **clientes não entram no sistema**. O administrador atende os clientes diretamente e utiliza o painel para encontrar informações e gerar relatórios. Um futuro sócio poderá ter usuário próprio, com escopo compartilhado e permissões a desenvolver.
+| Entrada | Quem usa | O que pode fazer |
+| --- | --- | --- |
+| [Gestão](https://clyriva-production.up.railway.app/) | Administrador autorizado | Gerir sua carteira, guardar documentos internos, registrar pagamentos, exportar dados e publicar avisos. |
+| [Clyriva Clientes](https://clyriva-production.up.railway.app/cliente.html) | Pessoa com acesso ativo à empresa | Ver avisos publicados, abrir ou baixar os arquivos liberados e escolher se deseja receber notificações no aparelho. |
+| [Avisos para clientes](https://clyriva-production.up.railway.app/avisos-admin.html) | Administrador autorizado | Gerir acessos, cobranças independentes, comunicados, histórico e revogações. |
 
-## Organização
+## Rotina do escritório
 
-- `index.html` + `app.js`: login Supabase Auth, verificação de administrador e painel; não oferece criação pública de contas.
-- `admin.html` + `panel.js` + `panel.css`: carteira, CNPJ, notas manuais, caixa, honorários, tributos, tarefas, cofre criptografado, backup e relatórios.
-- `core.js`: validação e cálculos compartilhados.
-- `rotina.js`: resumo mensal, atividades e tarefas.
-- `servidor.py`: servidor WSGI/HTTP; consulta CNPJ em produção exige JWT de administrador validado via RLS do Supabase.
-- `config.js`: URL e chave **publishable** pública do Supabase. Nunca usar `service_role` neste arquivo.
-- `db/migrations/`: documentação e SQL da migração aplicada na produção de 2026-11-19.
-- `schema_v1_6_reference.sql`: referência histórica; **NÃO executar no banco de produção já configurado**.
+Em **Visão geral → Meu dia / Minha semana**, selecione um contador para listar os registros. Os prazos usam o calendário de Brasília em todas as competências. O filtro de empresa se aplica à agenda das empresas ativas. Abrir a ficha por uma linha seleciona a competência daquele lançamento. Em cada linha é possível abrir a ficha, registrar pagamento ou concluir a tarefa. A tarefa pode ser marcada como **Aguardando retorno do cliente** na edição.
 
-## Banco e acessos
+Em **Meus clientes → Ficha → Cadastrar guia** ou **Criar tarefa**, é possível selecionar o PDF, JPG ou PNG antes de salvar. O registro é gravado primeiro. Se o documento falhar, use **Tentar novamente**. Para o cliente baixar os arquivos, use **Disponibilizar no app do cliente** e confira empresa, vencimento, valor, documentos e acessos. Esse passo se aplica também a novos anexos de uma guia já publicada.
 
-Supabase: `clyriva_admins` (usuários permitidos), `clyriva_workspace` (JSON de carteira), `clyriva_vault` (criptograma do cofre), `clyriva_workspace_history` (até 25 revisões anteriores por carteira). As tabelas antigas `clyriva_client_access` e `clyriva_client_views` foram preservadas sem acesso para clientes, para evitar exclusões irreversíveis.
+A agenda distingue guias sem anexo, envios pendentes, publicações e avisos arquivados. Uma guia publicada pode ainda ter um segundo PDF aguardando liberação. A consulta de documentos pode ser atualizada no painel.
 
-O proprietário é cadastrado em `clyriva_admins`; novos usuários nunca são promovidos automaticamente. A aplicação ainda **não implementa** workspace compartilhado entre dois administradores: não cadastrar um sócio como administrador sem implementar controle por workspace e permissões.
+## Código e persistência
 
-- `clyriva_load`: leitura da carteira.
-- `clyriva_commit`: gravação com checagem de revisão; `NULL` no cofre agora preserva o cofre existente.
-- `clyriva_restore_revision`: restaura uma revisão anterior, mantendo a atual no histórico.
-- `clyriva_private.publish`: desligada; não replica dados para portal de clientes.
-- Edge Function `clyriva-acessos`: desativada (HTTP 410, JWT obrigatório).
+| Componente | Responsabilidade |
+| --- | --- |
+| `index.html`, `app.js`, `admin.html`, `panel.js` | Login da gestão, carteira em memória, validação e gravação com revisão. |
+| `core.js`, `rotina.js` | Datas, valores em centavos, CPF e CNPJ, agenda e resumo mensal. |
+| `servidor.py` | Site e proxy de consulta CNPJ. A consulta usa BrasilAPI e CNPJ.ws. O cadastro aceita preenchimento manual. |
+| `cliente.js`, `avisos-admin.js`, `edge-functions/clyriva-client/` | Sessão do cliente, publicação explícita por empresa, arquivos privados, links curtos e lembretes. |
+| `pwa.js`, `sw.js`, `edge-functions/clyriva-push/` | Instalação dos apps e alertas da gestão. |
+| `db/migrations/` | Evolução do banco. O arquivo `schema_v1_6_reference.sql` é histórico e a instalação de testes o aplica somente a um banco vazio. |
 
-## Segurança e backups
+O Supabase Auth identifica cada usuário. A lista `clyriva_admins` e as políticas do banco delimitam a carteira do gestor. O aplicativo consulta os vínculos ativos por usuário e empresa a cada leitura. Um segundo administrador tem sua própria carteira. O compartilhamento entre sócios depende de implementação específica.
 
-- Login, controle de administrador, HTTPS, RLS no Supabase.
-- Cofre AES-GCM protegido por senha-mestra; não guarda a senha-mestra em servidor.
-- Backup JSON manual: **não é cifrado para nomes, CNPJs e valores**. Armazenar em local seguro. O cofre dentro do JSON está cifrado.
-- Histórico do banco guarda até 25 revisões anteriores; **não substitui um backup externo**.
-- Cadastro público pela API do Supabase Auth pode depender de configuração no painel Supabase: desativar `Allow new users to sign up` em Authentication → Providers para fechar totalmente a criação de contas. Isso não é controlado pelo frontend.
-- Não há emissão real de notas fiscais, consulta bancária ou recolhimento automático de tributos.
+O cofre usa AES-GCM e senha-mestra. O JSON de backup contém dados legíveis da carteira e o cofre cifrado. PDFs, imagens, publicações e autorizações precisam de cópia própria. O histórico guarda até 25 revisões anteriores da carteira. Em uma restauração, acessos revogados e avisos arquivados exigem nova ação da gestão.
 
-## Execução
+## Execução e implantação
 
-Local: `python servidor.py` e abrir `http://127.0.0.1:8765`. Necessita Supabase configurado e permissões no banco para login real. Produção: Dockerfile no Railway, `CLYRIVA_ENV=production` (fixado no Dockerfile); domínio `https://clyriva-production.up.railway.app`.
+Para iniciar o servidor, execute `python servidor.py` e abra `http://127.0.0.1:8765`. O login online requer uma conta autorizada no Supabase configurado. O Railway acompanha `main`, com build e comando do Gunicorn em `railway.json`. Para rodar pelo Dockerfile, a imagem já define `CLYRIVA_ENV=production`. O arquivo `config.js` recebe apenas URL e chave pública. Migrações do banco e funções Edge têm implantação separada do site.
 
-Para rodar testes básicos:
+O workflow de qualidade verifica regras da carteira, proxy, lembretes, interface em Chromium e integração com um Supabase descartável. A suíte de integração usa Docker e Supabase CLI. O script `bash tests/run_supabase_local.sh` cria seu próprio projeto local temporário e usa apenas a API do loopback.
 
-```
-python -m unittest discover -s tests -p '*test.py'
-node tests/core_private_test.js
-```
+Os controles de NF, tributos e pagamentos registram a atividade informada pelo escritório. Emissão fiscal, movimentação bancária e recolhimento de impostos exigem os sistemas próprios.
 
-Antes de inserir dados reais, teste login e cadastro de cliente com acesso autenticado; teste backup e restauração com dados fictícios. Nunca cole tokens de sessão ou senhas em relatórios.
+[Alterações e auditoria da v2.6](CHANGELOG_v2.6.md) · [Histórico da v2.5](CHANGELOG_v2.5.md) · [Guia do aplicativo do cliente](PWA_CLIENTES.md) · [Notificações da gestão](PWA_NOTIFICACOES.md)

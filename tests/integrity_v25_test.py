@@ -33,7 +33,7 @@ class IntegrityV25(unittest.TestCase):
 
     def test_manual_archival_is_preserved(self):
         self.assertIn("if(action==='internal-sync'&&found?.status==='archived')", EDGE)
-        self.assertIn("if(action==='internal-sync'&&found)delete data.body", EDGE)
+        self.assertIn("if(found)delete data.body", EDGE)
 
     def test_public_documents_stay_private(self):
         self.assertIn("createSignedUrl(doc.storage_path,60", EDGE)
