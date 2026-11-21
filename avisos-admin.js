@@ -188,10 +188,14 @@ function temporaryAccess(email,secret,url,created=true){
  const box=$('#invite-result');box.replaceChildren();const good=el('div',null,'notice');
  good.append(el('strong',created?'Senha temporária gerada.':'Acesso autorizado.'));
  good.append(el('p','E-mail: '+email));
+ const copy=el('button',secret?'Copiar credenciais para enviar em particular':'Copiar instruções de acesso','btn');copy.type='button';
+ copy.addEventListener('click',async()=>{
+  const lines=['Acesse o Clyriva Clientes pelo celular.',url,'E-mail: '+email,secret?'Senha provisória: '+secret:'Use sua senha atual.','Toque em “Instalar no celular” e abra o aplicativo pelo ícone. Entre, ative as notificações e toque em “Enviar notificação de teste”.'];
+  try{await navigator.clipboard.writeText(lines.join('\n'));copy.textContent='Acesso copiado';}
+  catch{status('#admin-feedback','A cópia automática falhou. Use o link do aplicativo e os dados de acesso desta tela.',true);}
+ });
+ good.append(copy);
  if(secret){
-  const copy=el('button','Copiar credenciais para enviar em particular','btn');copy.type='button';
-  copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText('Clyriva Clientes: '+url+'\nE-mail: '+email+'\nSenha provisória: '+secret);copy.textContent='Credenciais copiadas';}catch{status('#admin-feedback','Não foi possível copiar. Tente outro navegador.',true);}});
-  good.append(copy);
   const reveal=el('button','Mostrar senha por 30 segundos','btn');reveal.type='button';reveal.style.margin='8px';
   reveal.addEventListener('click',()=>{
    let display=good.querySelector('.temporary-secret');
@@ -207,7 +211,7 @@ function temporaryAccess(email,secret,url,created=true){
 async function invite(e){e.preventDefault();if(busy)return;busy=true;const form=e.target,b=form.querySelector('button[type="submit"]');b.disabled=true;status('#invite-result','Criando acesso…');
  try{
   const data=Object.fromEntries(new FormData(form));const value=await api('invite',data);
-temporaryAccess(value.email,value.temporaryPassword,value.loginUrl,value.created);await refresh();
+  temporaryAccess(value.email,value.temporaryPassword,value.loginUrl,value.created);await refresh();
  }catch(err){status('#invite-result',err.message,true);}finally{busy=false;b.disabled=false;}
 }
 async function publish(e){e.preventDefault();if(busy)return;busy=true;const form=e.target,b=form.querySelector('button[type="submit"]');b.disabled=true;
@@ -232,6 +236,14 @@ async function init(){
  $('#copy-client-link').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(location.origin+'/cliente.html');status('#admin-feedback','Link copiado.');}catch{status('#admin-feedback','Não foi possível copiar automaticamente. Link: '+location.origin+'/cliente.html',true);}});
  try{const {data:{user},error}=await client.auth.getUser();if(error||!user)throw Error('Entre pelo painel administrativo primeiro.');
   const {data,error:e}=await client.from('clyriva_admins').select('user_id').eq('user_id',user.id).maybeSingle();if(e||!data)throw Error('Esta página é exclusiva da gestão.');await refresh();
+  const [section,query]=location.hash.slice(1).split('?');
+  if(section==='autorizar'){
+   const form=$('#invite-form'),id=new URLSearchParams(query).get('empresa');
+   if(id&&state.companies.some(c=>c.id===id&&c.status!=='inactive'))form.elements.clientId.value=id;
+   else if(id)status('#invite-result','A empresa indicada não está disponível. Selecione uma empresa ativa.',true);
+   $('#autorizar').scrollIntoView({block:'start'});
+   (form.elements.clientId.value?form.elements.email:form.elements.clientId).focus({preventScroll:true});
+  }
  }catch(err){status('#admin-feedback',err.message,true);$('#admin-loading').textContent='Acesse primeiro o painel com sua conta administrativa.';}
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();

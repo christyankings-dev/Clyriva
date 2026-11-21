@@ -5,7 +5,7 @@
   "description": "Avisos e prazos da sua empresa, com acesso individual e notificações.",
   "lang": "pt-BR",
   "start_url": "/cliente.html?app=1",
-  "scope": "/",
+  "scope": "/cliente.html",
   "display": "standalone",
   "background_color": "#f5f9f8",
   "theme_color": "#0f2c36",

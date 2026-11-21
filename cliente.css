@@ -10,3 +10,16 @@
 .document-row .btn,.document-list>.btn{min-height:36px;padding:8px 12px;font-size:13px;width:auto}
 .document-list>.btn{align-self:flex-start}
 @media(max-width:680px){.document-list .btn,.document-list>.btn{flex:1 1 auto;width:auto}.document-row .document-name{flex-basis:100%}}
+.login-submit{margin-top:20px;width:100%}
+.install-inline{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+[data-install-feedback]{margin:8px 0 0}
+.login-help summary,.device-card summary{color:var(--teal);font-weight:650;cursor:pointer}
+.login-help p,.device-card details p{margin:9px 0 0}
+.device-card{border-top:3px solid var(--teal)}
+.device-card h2{margin-bottom:6px}
+.device-status{color:var(--muted);margin:0 0 13px}
+.device-card details{margin-top:14px}
+.status:empty{min-height:0;margin:0}
+.login-help{margin-top:14px}
+.status.error{color:#922e41}
+.access-shortcut{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}

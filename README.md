@@ -8,6 +8,12 @@ O Clyriva reúne a carteira, os honorários, as notas fiscais de controle, o cai
 | [Clyriva Clientes](https://clyriva-production.up.railway.app/cliente.html) | Pessoa com acesso ativo à empresa | Ver avisos publicados, abrir ou baixar os arquivos liberados e escolher se deseja receber notificações no aparelho. |
 | [Avisos para clientes](https://clyriva-production.up.railway.app/avisos-admin.html) | Administrador autorizado | Gerir acessos, cobranças independentes, comunicados, histórico e revogações. |
 
+## Primeiro acesso pelo celular
+
+Na ficha de uma empresa ativa, selecione **Criar login do cliente**, confira a empresa, informe o e-mail da pessoa e copie o acesso para enviar em particular. Clientes já autorizados usam a senha existente. Para testar o perfil de cliente no seu celular, use um e-mail diferente do seu login administrativo.
+
+O cliente abre o link recebido, toca em **Instalar no celular**, abre o ícone **Clyriva Clientes** e entra com o e-mail e a senha. Em **Notificações neste aparelho**, toca em **Ativar notificações**, permite o envio e escolhe **Enviar notificação de teste**. O serviço informa se aceitou o teste. A exibição é conferida na central de notificações do próprio aparelho. No iPhone ou iPad, o Web Push requer iOS/iPadOS 16.4 ou posterior e o aplicativo adicionado à Tela de Início.
+
 ## Rotina do escritório
 
 Em **Visão geral → Meu dia / Minha semana**, selecione um contador para listar os registros. Os prazos usam o calendário de Brasília em todas as competências. O filtro de empresa se aplica à agenda das empresas ativas. Abrir a ficha por uma linha seleciona a competência daquele lançamento. Em cada linha é possível abrir a ficha, registrar pagamento ou concluir a tarefa. A tarefa pode ser marcada como **Aguardando retorno do cliente** na edição.

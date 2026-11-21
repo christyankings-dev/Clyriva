@@ -46,7 +46,7 @@ class Query {
  }
  then(ok,fail){return Promise.resolve(this.execute()).then(ok,fail);}
 }
-const client={from:(table)=>new Query(table),rpc:async()=>({data:{privateKey:'private-test-key',cronToken:'cron-test-token'},error:null}),auth:{getUser:async()=>({data:{user:null},error:null})}};
+const client={from:(table)=>new Query(table),rpc:async()=>({data:{privateKey:'private-test-key',cronToken:'cron-test-token'},error:null}),auth:{getUser:async token=>({data:{user:token==='teste-cliente'?{id:'client-1',email_confirmed_at:'2026-11-20'}:null},error:null})}};
 const webpush={setVapidDetails:()=>{},sendNotification:async(_,payload)=>{state.sent.push(JSON.parse(payload));}};
 const context={createClient:()=>client,webpush,...rules,Deno:{env:{get:()=> 'placeholder'},serve:fn=>{handler=fn;}},console:{error:()=>{}},crypto:crypto.webcrypto,Request,Response,URL,Date,Intl,setTimeout};
 vm.runInNewContext(code,context,{timeout:2000});assert.equal(typeof handler,'function');
@@ -65,3 +65,16 @@ const retry=await dispatch();assert.equal(retry.sent,1);assert.equal(state.sent.
 assert.equal(state.deliveries.find(x=>x.notice_id===id)?.state,'sent');
 const once=await dispatch();assert.equal(once.sent,0);assert.equal(state.sent.length,2);
 console.log('EDGE V2.2 PASS: auth, D-3, privacy, per-day dedup, paid stop, stale lease recovery, no duplicate');
+
+const sendTest=()=>handler(new Request('https://example.supabase.co/functions/v1/clyriva-client/client-test',{
+ method:'POST',headers:{authorization:'Bearer teste-cliente','content-type':'application/json'},
+ body:JSON.stringify({endpoint:state.devices[0].endpoint})
+}));
+const testResponse=await sendTest();
+assert.equal(testResponse.status,200);
+assert.equal(state.sent.at(-1).title,'Notificação de teste');
+assert.equal(state.sent.at(-1).url,'/cliente.html');
+const count=state.sent.length;
+assert.equal((await sendTest()).status,429);
+assert.equal(state.sent.length,count);
+console.log('PASS teste individual do aparelho e intervalo de reenvio com transporte simulado');

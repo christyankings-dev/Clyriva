@@ -101,6 +101,14 @@ def main():
     alice=invite(a,"cliente-a@example.test")
     b_mail="cliente-b@example.test"
     bob=invite(b,b_mail)
+    # Só registrar e consultar no banco descartável. Este endereço fictício nunca recebe um envio.
+    endpoint="https://fcm.googleapis.com/fcm/send/clyriva-local-device"
+    sub={"endpoint":endpoint,"keys":{"p256dh":"a"*87,"auth":"b"*22}}
+    op("client-subscribe",alice,{"subscription":sub,"showAmount":False})
+    assert op("client-push-status",alice,{"endpoint":endpoint})["enabled"]
+    assert not op("client-push-status",bob,{"endpoint":endpoint})["enabled"]
+    op("client-unsubscribe",alice,{"endpoint":endpoint})
+    assert not op("client-push-status",alice,{"endpoint":endpoint})["enabled"]
     assert rpc("clyriva_load", alice) is None
     for actor in (alice, ANON):
         rpc("clyriva_commit", actor, {"p_expected":0,"p_workspace":w,"p_vault":None}, (401,403))

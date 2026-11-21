@@ -1,5 +1,5 @@
 /* Clyriva PWA: nenhum registro financeiro ou sessão armazenado no cache. */
-const CACHE='clyriva-shell-v2';
+const CACHE='clyriva-shell-v3';
 const STATIC=['/offline.html','/icons/clyriva-192.png','/icons/clyriva-512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(STATIC)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',event=>{event.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('clyriva-shell-')&&k!==CACHE).map(k=>caches.delete(k)))),self.clients.claim()]));});
