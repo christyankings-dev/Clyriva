@@ -56,7 +56,8 @@ context.self.location={origin};
 context.self.clients={matchAll:async()=>[origin+'/cliente.html?app=1',origin+'/','https://outro.test/cliente.html']
   .map(url=>({url,postMessage:message=>received.push({url,message})}))};
 let displayError=false;
-context.self.registration={showNotification:async()=>{if(displayError)throw Error('Sem permissão');}};
+const tags=[];
+context.self.registration={showNotification:async(_,options)=>{if(displayError)throw Error('Sem permissão');tags.push(options.tag);}};
 function deliver(payload){
   let done;
   events.get('push')({data:{json:()=>payload},waitUntil:promise=>{done=promise;}});
@@ -73,4 +74,7 @@ assert.deepEqual(recorded,[testId]);
 assert.equal(received.length,1);
 assert.equal(received[0].url,origin+'/cliente.html?app=1');
 assert.equal(received[0].message.testId,testId);
+const firstTag=tags.at(-1);
+await deliver({...payload,testId:'70b188c7-bb3c-4d11-81d7-8d04e828927d'});
+assert.notEqual(tags.at(-1),firstTag);
 console.log('PASS confirmação somente após exibição de um teste válido no portal do cliente');

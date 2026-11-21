@@ -23,7 +23,8 @@ async function displayPush(d){
  const body=typeof d.body==='string'?d.body:'Abra o Clyriva para verificar suas pendências.';
  const url=d.url==='/cliente.html'?'/cliente.html':'/';
  const testId=url==='/cliente.html'&&d.tag==='teste-cliente'&&ClyrivaPushTest.validId(d.testId)?d.testId:null;
- await self.registration.showNotification(title,{body,icon:'/icons/clyriva-192.png',badge:'/icons/clyriva-192.png',tag:'clyriva-'+(d.tag||'gestao'),renotify:false,data:testId?{url,testId}:{url}});
+ const tag=testId?'clyriva-teste-'+testId:'clyriva-'+(d.tag||'gestao');
+ await self.registration.showNotification(title,{body,icon:'/icons/clyriva-192.png',badge:'/icons/clyriva-192.png',tag,renotify:false,data:testId?{url,testId}:{url}});
  if(!testId)return;
  const shownAt=Date.now();
  // Gravar mesmo com o app fechado. Uma falha de armazenamento não impede o retorno à tela aberta.
