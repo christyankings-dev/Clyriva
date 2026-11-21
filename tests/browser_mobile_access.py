@@ -14,7 +14,7 @@ CONFIG = "window.CLYRIVA_CONFIG={supabaseUrl:location.origin,supabaseAnonKey:'te
 AUTH = """
 window.supabase={createClient:()=>({
  auth:{
-  getSession:async()=>({data:{session:sessionStorage.getItem('signed')?{access_token:'teste'}:null}}),
+  getSession:async()=>({data:{session:(location.pathname==='/avisos-admin.html'||sessionStorage.getItem('signed'))?{access_token:'teste'}:null}}),
   getUser:async()=>({data:{user:{id:'gestor-ficticio'}}}),
   signInWithPassword:async({email,password})=>{
    if(email!=='pessoa@example.test'||password!=='senha-do-teste')return {error:{code:'invalid_credentials'}};
@@ -95,6 +95,7 @@ def onboarding(browser, origin):
     errors = []
     page.on("pageerror",lambda err:errors.append(str(err)))
     page.goto(origin+"/avisos-admin.html#autorizar?empresa=acme")
+    expect(page.locator("#admin-workspace")).to_be_visible()
     expect(page.locator('#invite-form [name="clientId"]')).to_have_value("acme")
     page.locator('#invite-form [name="email"]').fill("pessoa@example.test")
     page.locator('#invite-form button').click()
