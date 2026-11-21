@@ -333,16 +333,14 @@ async function init(){
  $('#client-password-form').addEventListener('submit',changePassword);
  $('#client-notice-filter').addEventListener('change',()=>refresh().catch(e=>status('#client-feedback',e.message,true)));
  sb.auth.onAuthStateChange((event,session)=>{
-  if(event==='SIGNED_OUT'){sessionOwner=null;clearClientScreen();return;}
-  const next=session?.user?.id;
-  if(!next)return;
-  const changed=sessionOwner&&sessionOwner!==next;
-  sessionOwner=next;
-  if(changed){
+  if(event==='SIGNED_OUT')clearClientScreen();
+  const next=session?.user?.id||null;
+  if(next&&sessionOwner&&sessionOwner!==next){
    clearClientScreen();
    const version=screenVersion;
    setTimeout(()=>{if(version===screenVersion)refresh().catch(e=>{if(version===screenVersion)status('#login-feedback',e.message,true);});},0);
   }
+  sessionOwner=next;
  });
  $('#client-logout').addEventListener('click',logout);
  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;});
