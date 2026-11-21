@@ -165,6 +165,13 @@ def service_worker(browser, origin):
       const msgs=await r.getNotifications();
       return msgs.some(n=>n.title==='Clyriva · Notificação de teste' && n.data.url==='/cliente.html');
     }""",timeout=10000)
+    ctx.set_offline(True)
+    page.reload(wait_until="domcontentloaded")
+    reconnect=page.get_by_role("link",name="Abrir Clyriva Clientes")
+    expect(reconnect).to_be_visible()
+    ctx.set_offline(False)
+    reconnect.click()
+    expect(page.locator("#client-login")).to_be_visible()
     ctx.close()
     print("OK push simulado no Chromium com worker real, notificação exibida e destino Clyriva Clientes")
 

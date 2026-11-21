@@ -72,6 +72,7 @@ function lockDevice(busy){
 }
 function unmetRequirement(){
  if(ios&&!standalone())return 'No iPhone ou iPad, adicione o aplicativo à Tela de Início pelo Safari e abra-o pelo ícone para ativar os alertas.';
+ if(ios&&(!('Notification' in window)||!('PushManager' in window)))return 'Para receber notificações no iPhone ou iPad, use iOS/iPadOS 16.4 ou posterior e abra o app pela Tela de Início.';
  if(!supported()||!('Notification' in window)||!('PushManager' in window))return 'Abra este link no Safari do iPhone ou em um navegador compatível no Android para ativar os alertas.';
  if(Notification.permission==='denied')return 'As notificações estão bloqueadas. Libere a permissão nas configurações do aparelho ou do site e volte aqui.';
  return '';
@@ -195,6 +196,8 @@ async function enable(){
 async function test(){
  if(pushBusy)return;const version=screenVersion;lockDevice(true);status('#push-feedback','Enviando teste…');
  try{
+  const problem=unmetRequirement();
+  if(problem||Notification.permission!=='granted'){renderDevice(false,problem||'Autorize as notificações para fazer o teste.');throw Error($('#device-status').textContent);}
   const {sub,preference}=await currentDevice(await ready());
   if(!sub||!preference.enabled){renderDevice(false,'Ative as notificações para testar este aparelho.');throw Error('Este aparelho ainda não está inscrito.');}
   await api('client-test',{endpoint:sub.endpoint});
@@ -206,8 +209,8 @@ async function disconnectDevice(){
  // A inscrição da gestão pode ocupar o escopo raiz. Só remover ali a inscrição confirmada para o cliente.
  const active=await ready(),dedicated=await active.pushManager.getSubscription();
  let legacy=null,warning='';
- try{legacy=(await legacyDevice())?.sub;}catch{warning='Não foi possível conferir uma inscrição antiga. Verifique as permissões do aparelho.';}
- const all=new Map([dedicated,legacy,lastDevice].filter(Boolean).map(sub=>[sub.endpoint,sub]));
+ try{legacy=(await legacyDevice())?.sub;}catch{legacy=lastDevice;warning='Não foi possível conferir uma inscrição antiga. Verifique as permissões do aparelho.';}
+ const all=new Map([dedicated,legacy].filter(Boolean).map(sub=>[sub.endpoint,sub]));
  for(const sub of all.values()){
   try{await api('client-unsubscribe',{endpoint:sub.endpoint});}catch{warning='Não foi possível confirmar a remoção no servidor.';}
   try{if(!await sub.unsubscribe())warning='Confira se as notificações foram desativadas nas configurações do aparelho.';}catch{warning='Confira as permissões de notificação nas configurações do aparelho.';}
