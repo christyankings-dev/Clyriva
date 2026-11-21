@@ -107,6 +107,9 @@ def main():
     op("client-subscribe",alice,{"subscription":sub,"showAmount":False})
     assert op("client-push-status",alice,{"endpoint":endpoint})["enabled"]
     assert not op("client-push-status",bob,{"endpoint":endpoint})["enabled"]
+    test_id = "19488902-c618-4652-acc8-3726cd5fe08d"
+    op("client-test", bob, {"endpoint":endpoint,"testId":test_id}, (404,))
+    op("client-test", alice, {"endpoint":endpoint,"testId":"invalido"}, (400,))
     op("client-unsubscribe",alice,{"endpoint":endpoint})
     assert not op("client-push-status",alice,{"endpoint":endpoint})["enabled"]
     assert rpc("clyriva_load", alice) is None

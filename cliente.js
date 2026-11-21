@@ -6,9 +6,12 @@ const sb=window.supabase.createClient(config.supabaseUrl,config.supabaseAnonKey,
 const CLIENT_SCOPE='/cliente.html';
 let deferred=null, registrationPromise=null, loaded=false, acting=false;
 let screenVersion=0, deviceVersion=0, pushBusy=false, deviceEnabled=false, lastDevice=null;
+let latestTest=null, testTimer=null, sessionOwner=null;
 
 function clearClientScreen(){
  screenVersion++;deviceVersion++;loaded=false;lastDevice=null;pushBusy=false;
+ if(latestTest)ClyrivaPushTest.forget(latestTest.id).catch(()=>{});
+ showTest(null);
  for(const id of ['#client-notices','#client-billing-overview'])$(id).replaceChildren();
  for(const id of ['#c-password','#c-email'])$(id).value='';
  $('#client-password-form').reset();$('#client-show-amount').checked=false;
@@ -70,6 +73,46 @@ function renderDevice(enabled,message){
 function lockDevice(busy){
  pushBusy=busy;renderDevice(deviceEnabled,$('#device-status').textContent);
 }
+function showTest(row){
+ latestTest=row;clearTimeout(testTimer);
+ const result=$('#client-test-result');result.hidden=!row;
+ if(!row){result.textContent='';return;}
+ if(row.state==='shown'){
+  const shown=new Date(row.shownAt);
+  const time=shown.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const when=shown.toDateString()===new Date().toDateString()?'às '+time:'em '+shown.toLocaleDateString('pt-BR')+' às '+time;
+  result.textContent='Este aparelho confirmou a notificação de teste '+when+'. Confira a central de notificações.';
+  return;
+ }
+ if(row.state==='legacy'){result.textContent='O serviço aceitou o teste. Procure a notificação na central deste aparelho.';return;}
+ const remaining=row.started+45000-Date.now();
+ const accepted=row.state==='accepted';
+ if(remaining>0){
+  result.textContent=accepted?'O serviço aceitou o teste. Aguardando a confirmação deste aparelho.':'Aguardando a confirmação do envio.';
+  testTimer=setTimeout(()=>showTest(row),remaining);
+ }else{
+  result.textContent=(accepted?'O serviço aceitou o teste. ':'')+'Este aparelho ainda não confirmou. Confira a conexão, a central de notificações e as permissões do Clyriva.';
+ }
+}
+async function recoverTest(){
+ if(!loaded)return;
+ if(latestTest&&Date.now()-latestTest.started>=86400000)showTest(null);
+ const version=screenVersion, prior=latestTest?.id;
+ try{
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session?.user?.id)return;
+  const saved=await ClyrivaPushTest.read(session.user.id);
+  if(!saved||!loaded||screenVersion!==version||latestTest?.id!==prior)return;
+  if(latestTest&&(saved.started<latestTest.started||(saved.id===prior&&latestTest.state==='shown')))return;
+  showTest(saved);
+ }catch{/* Um aparelho sem armazenamento ainda pode confirmar com o app aberto. */}
+}
+function testDisplayed(event){
+ const message=event.data;
+ if(!loaded||event.origin!==location.origin||event.source?.scriptURL!==location.origin+'/sw.js')return;
+ if(message?.type!=='clyriva-test-shown'||!latestTest||message.testId!==latestTest.id)return;
+ showTest({...latestTest,state:'shown',shownAt:message.shownAt});
+}
 function unmetRequirement(){
  if(ios&&!standalone())return 'No iPhone ou iPad, adicione o aplicativo à Tela de Início pelo Safari e abra-o pelo ícone para ativar os alertas.';
  if(ios&&(!('Notification' in window)||!('PushManager' in window)))return 'Para receber notificações no iPhone ou iPad, use iOS/iPadOS 16.4 ou posterior e abra o app pela Tela de Início.';
@@ -124,7 +167,7 @@ async function refresh(){
  if(!localItems.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='Nenhum aviso publicado para sua empresa até o momento.';area.append(empty);}
  else for(const notice of localItems)area.append(noticeCard(notice,byClient.get(notice.admin_id+'|'+notice.client_id)||'Sua empresa',(data.attachments||[]).filter(a=>a.notice_id===notice.id)));
  status('#client-feedback',`${(data.companies||[]).length} empresa(s) autorizada(s) · ${notices.length} aviso(s).`);
- const entering=!loaded;loaded=true;view(true);if(entering)refreshPushPreference();
+ const entering=!loaded;loaded=true;view(true);if(entering){refreshPushPreference();recoverTest();}
 }
 async function signIn(e){
  e.preventDefault();if(acting)return;acting=true;
@@ -194,15 +237,40 @@ async function enable(){
  finally{if(version===screenVersion)lockDevice(false);}
 }
 async function test(){
- if(pushBusy)return;const version=screenVersion;lockDevice(true);status('#push-feedback','Enviando teste…');
+ if(pushBusy)return;
+ const version=screenVersion;let testId=null;
+ lockDevice(true);status('#push-feedback','');
  try{
   const problem=unmetRequirement();
   if(problem||Notification.permission!=='granted'){renderDevice(false,problem||'Autorize as notificações para fazer o teste.');throw Error($('#device-status').textContent);}
   const {sub,preference}=await currentDevice(await ready());
   if(!sub||!preference.enabled){renderDevice(false,'Ative as notificações para testar este aparelho.');throw Error('Este aparelho ainda não está inscrito.');}
-  await api('client-test',{endpoint:sub.endpoint});
-  if(version===screenVersion)status('#push-feedback','O serviço aceitou o teste. Procure “Clyriva · Notificação de teste” na central de notificações deste aparelho.');
- }catch(e){if(version===screenVersion){status('#push-feedback',e.message||'Falha ao enviar o teste.',true);if(e.status===404||e.status===502)refreshPushPreference();}}
+  const {data:{session}}=await sb.auth.getSession();
+  if(version!==screenVersion)return;
+  if(latestTest&&Date.now()-latestTest.started<30000)throw Error('Aguarde 30 segundos entre os testes.');
+  testId=crypto.randomUUID();
+  const row={id:testId,owner:session?.user?.id||null,started:Date.now(),state:'requested'};
+  showTest(row);
+  if(row.owner)await ClyrivaPushTest.start(row).catch(()=>{});
+  if(version!==screenVersion)return;
+  const reply=await api('client-test',{endpoint:sub.endpoint,testId});
+  const state=reply.testId===testId?'accepted':'legacy';
+  const saved=await ClyrivaPushTest.mark(testId,state).catch(()=>null);
+  if(version===screenVersion&&latestTest?.id===testId&&latestTest.state!=='shown'){
+   showTest(saved?.id===testId?saved:{...row,state});
+  }
+ }catch(e){
+  if(version!==screenVersion)return;
+  // Uma resposta perdida pode chegar depois do push. Preservar uma confirmação local nesse caso.
+  if(latestTest?.id===testId&&latestTest.state==='shown')return;
+  if(testId&&e.status&&e.status<500){
+   await ClyrivaPushTest.forget(testId).catch(()=>{});
+   if(version!==screenVersion)return;
+   if(latestTest?.id===testId)showTest(null);
+  }
+  status('#push-feedback',e.message||'Falha ao enviar o teste.',true);
+  if(e.status===404||e.status===502)refreshPushPreference();
+ }
  finally{if(version===screenVersion)lockDevice(false);}
 }
 async function disconnectDevice(){
@@ -254,6 +322,9 @@ async function install(){
  installFeedback(ios?'No Safari, toque em Compartilhar → Adicionar à Tela de Início. Depois, abra o ícone Clyriva Clientes.':'No Chrome, abra o menu ⋮ → Instalar app ou Adicionar à tela inicial. Depois, abra o ícone Clyriva Clientes.');
 }
 async function init(){
+ navigator.serviceWorker?.addEventListener?.('message',testDisplayed);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)recoverTest();});
+ window.addEventListener('pageshow',recoverTest);
  $('#client-login').addEventListener('submit',signIn);$('#client-refresh').addEventListener('click',()=>refresh().catch(e=>status('#client-feedback',e.message,true)));
  $('#client-show-amount').addEventListener('change',()=>status('#push-feedback',deviceEnabled?'Toque em “Salvar preferência” para aplicar a alteração.':'A preferência será salva quando você ativar as notificações.'));
  $('#client-push-enable').addEventListener('click',enable);$('#client-push-test').addEventListener('click',test);$('#client-push-disable').addEventListener('click',disable);
@@ -261,7 +332,16 @@ async function init(){
  updateInstall();window.addEventListener('appinstalled',()=>{deferred=null;installFeedback('Abra o ícone Clyriva Clientes na tela inicial.');updateInstall();});
  $('#client-password-form').addEventListener('submit',changePassword);
  $('#client-notice-filter').addEventListener('change',()=>refresh().catch(e=>status('#client-feedback',e.message,true)));
- sb.auth.onAuthStateChange((event)=>{if(event==='SIGNED_OUT')clearClientScreen();});
+ sb.auth.onAuthStateChange((event,session)=>{
+  if(event==='SIGNED_OUT')clearClientScreen();
+  const next=session?.user?.id||null;
+  if(next&&sessionOwner&&sessionOwner!==next){
+   clearClientScreen();
+   const version=screenVersion;
+   setTimeout(()=>{if(version===screenVersion)refresh().catch(e=>{if(version===screenVersion)status('#login-feedback',e.message,true);});},0);
+  }
+  sessionOwner=next;
+ });
  $('#client-logout').addEventListener('click',logout);
  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;});
  if(supported())ready().catch(()=>{});

@@ -18,6 +18,7 @@ class Query {
  constructor(table){this.table=table;this.filters=[];this.op='select';this.patch=null;this.value=null;this.take=Infinity;this.sort=null;}
  select(){return this;}
  eq(f,v){this.filters.push(row=>row[f]===v);return this;}
+ is(f,v){this.filters.push(row=>(row[f]??null)===v);return this;}
  lt(f,v){this.filters.push(row=>row[f]<v);return this;}
  gte(f,v){this.filters.push(row=>row[f]>=v);return this;}
  lte(f,v){this.filters.push(row=>row[f]<=v);return this;}
@@ -42,7 +43,7 @@ class Query {
   if(this.op==='delete')for(const r of matches){const i=arr.indexOf(r);if(i>=0)arr.splice(i,1);}
   if(this.op==='update')for(const r of matches)Object.assign(r,this.patch);
   matches=matches.slice(0,this.take);
-  return {data:mode==='single'?matches[0]||null:matches,error:null};
+  return {data:mode==='single'?(matches.length?{...matches[0]}:null):matches,error:null};
  }
  then(ok,fail){return Promise.resolve(this.execute()).then(ok,fail);}
 }
@@ -66,9 +67,9 @@ assert.equal(state.deliveries.find(x=>x.notice_id===id)?.state,'sent');
 const once=await dispatch();assert.equal(once.sent,0);assert.equal(state.sent.length,2);
 console.log('EDGE V2.2 PASS: auth, D-3, privacy, per-day dedup, paid stop, stale lease recovery, no duplicate');
 
-const sendTest=()=>handler(new Request('https://example.supabase.co/functions/v1/clyriva-client/client-test',{
+const sendTest=(extra={})=>handler(new Request('https://example.supabase.co/functions/v1/clyriva-client/client-test',{
  method:'POST',headers:{authorization:'Bearer teste-cliente','content-type':'application/json'},
- body:JSON.stringify({endpoint:state.devices[0].endpoint})
+ body:JSON.stringify({endpoint:state.devices[0].endpoint,...extra})
 }));
 const testResponse=await sendTest();
 assert.equal(testResponse.status,200);
@@ -77,4 +78,13 @@ assert.equal(state.sent.at(-1).url,'/cliente.html');
 const count=state.sent.length;
 assert.equal((await sendTest()).status,429);
 assert.equal(state.sent.length,count);
-console.log('PASS teste individual do aparelho e intervalo de reenvio com transporte simulado');
+assert.equal((await sendTest({testId:'sem-id-valido'})).status,400);
+state.devices[0].last_test_at=new Date(Date.now()-35000).toISOString();
+const ids=[crypto.randomUUID(),crypto.randomUUID()];
+const concurrent=await Promise.all(ids.map(testId=>sendTest({testId})));
+assert.deepEqual(concurrent.map(r=>r.status).sort(),[200,429]);
+const accepted=await concurrent.find(r=>r.ok).json();
+assert.equal(accepted.testId,state.sent.at(-1).testId);
+assert.ok(ids.includes(accepted.testId));
+assert.equal(state.sent.length,count+1);
+console.log('PASS clientes anteriores, correlação do teste e dois pedidos simultâneos com um só envio');

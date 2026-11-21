@@ -2,6 +2,7 @@
 import json
 import sys
 import threading
+import uuid
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from playwright.sync_api import expect, sync_playwright
@@ -14,14 +15,15 @@ CONFIG = "window.CLYRIVA_CONFIG={supabaseUrl:location.origin,supabaseAnonKey:'te
 AUTH = """
 window.supabase={createClient:()=>({
  auth:{
-  getSession:async()=>({data:{session:(location.pathname==='/avisos-admin.html'||sessionStorage.getItem('signed'))?{access_token:'teste'}:null}}),
+  getSession:async()=>({data:{session:(location.pathname==='/avisos-admin.html'||sessionStorage.getItem('signed'))?{access_token:'teste',user:{id:sessionStorage.getItem('signed')||'gestor'}}:null}}),
   getUser:async()=>({data:{user:{id:'gestor-ficticio'}}}),
   signInWithPassword:async({email,password})=>{
    if(email!=='pessoa@example.test'||password!=='senha-do-teste')return {error:{code:'invalid_credentials'}};
-   sessionStorage.setItem('signed','1');return {error:null};
+   sessionStorage.setItem('signed','1');window.authChange?.('SIGNED_IN',{user:{id:'1'}});return {error:null};
   },
   signOut:async()=>{sessionStorage.removeItem('signed');return {error:null};},
-  onAuthStateChange:()=>({})
+  onAuthStateChange:cb=>{window.authChange=cb;const id=sessionStorage.getItem('signed');
+   queueMicrotask(()=>cb('INITIAL_SESSION',id?{user:{id}}:null));return {};}
  },
  from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:{user_id:'gestor-ficticio'}})})})})
 })};
@@ -90,6 +92,8 @@ def onboarding(browser, origin):
         elif action == "client-test":
             assert data["endpoint"] in enrolled
             attempts.append(data["endpoint"])
+            assert uuid.UUID(data["testId"]).version == 4
+            out["testId"]=data["testId"]
         elif action == "client-unsubscribe":
             enrolled.discard(data["endpoint"])
         else:
@@ -127,7 +131,7 @@ def onboarding(browser, origin):
     expect(page.locator('#client-push-test')).to_be_enabled()
     assert enrolled == {client_device}
     page.locator('#client-push-test').click()
-    expect(page.locator('#push-feedback')).to_contain_text("serviço aceitou")
+    expect(page.locator('#client-test-result')).to_contain_text("serviço aceitou")
     assert attempts == [client_device]
     page.locator('#client-logout').click()
     expect(page.locator('#client-login')).to_be_visible()
@@ -142,15 +146,33 @@ def onboarding(browser, origin):
     page.get_by_role("button",name="Entrar",exact=True).click()
     expect(page.locator('#client-push-test')).to_be_enabled()
     page.locator('#client-push-test').click()
-    expect(page.locator('#push-feedback')).to_contain_text("serviço aceitou")
+    expect(page.locator('#client-test-result')).to_contain_text("serviço aceitou")
     assert attempts == [client_device,admin_root]
     assert not errors,errors
     ctx.close()
     print("OK convite por empresa, instalação antes de entrar, senha, permissão e teste individual; acesso legado preservado")
 
 
-def service_worker(browser, origin, server):
+def service_worker(browser, origin, server, background):
     ctx=browser.new_context(permissions=["notifications"])
+    ctx.add_init_script("""Object.defineProperty(PushManager.prototype,'getSubscription',{
+      value: async()=>({endpoint:'https://fcm.googleapis.com/fcm/send/clyriva-worker-ficticio'})
+    })""")
+    attempts=[]
+    def backend(route):
+        action=route.request.url.rsplit("/",1)[-1]
+        out={"ok":True}
+        if action=="client-list":
+            out.update(companies=[{"client_id":"empresa","admin_id":"gestor","company":"Empresa de teste"}],notices=[])
+        elif action=="client-push-status":
+            out.update(enabled=True,showAmount=False)
+        elif action=="client-test":
+            out["testId"]=route.request.post_data_json["testId"]
+            attempts.append(out["testId"])
+        else:
+            raise AssertionError(action)
+        route.fulfill(json=out)
+    ctx.route("**/functions/v1/**",backend)
     page=ctx.new_page()
     cdp=ctx.new_cdp_session(page)
     registrations={}
@@ -162,15 +184,43 @@ def service_worker(browser, origin, server):
     page.goto(origin+"/cliente.html?app=1")
     page.wait_for_function("""async()=> (await navigator.serviceWorker.getRegistration(location.href))?.active?.state==='activated'""")
     scope=origin+"/cliente.html"
-    assert scope in registrations,registrations
-    payload={"title":"Notificação de teste","body":"Teste no navegador","url":"/cliente.html","tag":"teste-cliente"}
-    cdp.send("ServiceWorker.deliverPushMessage",{"origin":origin,"registrationId":registrations[scope],"data":json.dumps(payload)})
-    page.wait_for_function("""async()=> {
-      const r=await navigator.serviceWorker.getRegistration(location.href);
-      const msgs=await r.getNotifications();
-      return msgs.some(n=>n.title==='Clyriva · Notificação de teste' && n.data.url==='/cliente.html');
-    }""",timeout=10000)
+    page.locator('#c-email').fill("pessoa@example.test")
+    page.locator('#c-password').fill("senha-do-teste")
+    page.get_by_role("button",name="Entrar",exact=True).click()
+    page.locator("#client-push-test").click()
+    result=page.locator("#client-test-result")
+    expect(result).to_contain_text("serviço aceitou")
+    assert scope in registrations and len(attempts)==1
+    def deliver(test_id):
+        payload={"title":"Notificação de teste","body":"Teste no navegador","url":"/cliente.html",
+                 "tag":"teste-cliente","testId":test_id}
+        cdp.send("ServiceWorker.deliverPushMessage",{"origin":origin,"registrationId":registrations[scope],"data":json.dumps(payload)})
+        page.wait_for_function("""async id=>{
+          const r=await navigator.serviceWorker.getRegistration('/cliente.html');
+          const msgs=await r.getNotifications();
+          return msgs.some(n=>n.title==='Clyriva · Notificação de teste' && n.data.url==='/cliente.html' && n.data.testId===id);
+        }""",arg=test_id,timeout=10000)
+    deliver(str(uuid.uuid4()))
+    expect(result).to_contain_text("Aguardando a confirmação")
+    if background:
+        page.goto(origin+"/offline.html")  # nenhum portal de cliente aberto quando o push chegar
+    deliver(attempts[0])
+    if background:
+        page.evaluate("""async()=>{const r=await navigator.serviceWorker.getRegistration('/cliente.html');
+          for(const n of await r.getNotifications())n.close();}""")
+        page.goto(origin+"/cliente.html")
+    expect(result).to_contain_text("Este aparelho confirmou")
+    page.reload()
+    expect(result).to_contain_text("Este aparelho confirmou")
+    page.evaluate("""()=>{sessionStorage.setItem('signed','outra-conta-ficticia');
+      window.authChange('SIGNED_IN',{user:{id:'outra-conta-ficticia'}});}""")
+    expect(page.locator("#client-area")).to_be_visible()
+    expect(result).to_be_hidden()
     cdp.detach()
+    if not background:
+        ctx.close()
+        return
+    page.evaluate("sessionStorage.removeItem('signed')")
     page.wait_for_function("""async()=>navigator.serviceWorker.controller && !!(await caches.match('/offline.html'))""")
     # Entrar pelo link, como no celular. O servidor mantém os demais recursos disponíveis.
     page.goto(origin+"/offline.html")
@@ -198,7 +248,8 @@ if __name__ == "__main__":
                 browser=pw.chromium.launch(executable_path="/usr/bin/chromium",args=["--no-sandbox","--disable-dev-shm-usage"])
                 origin=f"http://127.0.0.1:{server.server_port}"
                 onboarding(browser,origin)
-                service_worker(browser,origin,server)
+                service_worker(browser,origin,server,background=False)
+                service_worker(browser,origin,server,background=True)
                 browser.close()
         finally:
             server.shutdown()

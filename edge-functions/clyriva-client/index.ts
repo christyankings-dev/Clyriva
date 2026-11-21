@@ -604,12 +604,20 @@ async function clientHandler(uid:string,action:string,body:any){
  }
  if(action==='test'){
   if(!validEndpoint(body?.endpoint))return fail('Dispositivo inválido.');
+  const testId=body.testId;
+  if(testId!==undefined&&(typeof testId!=='string'||!UUID_RE.test(testId)||testId[14]!=='4'))return fail('Identificador de teste inválido.');
   const {data:sub,error:e}=await db.from('clyriva_client_push_subscriptions').select('endpoint,p256dh,auth_secret,last_test_at').eq('endpoint',body.endpoint).eq('user_id',uid).eq('enabled',true).maybeSingle();
-  if(e||!sub)return fail('Ative as notificações primeiro.',404);
+  if(e)throw e;if(!sub)return fail('Ative as notificações primeiro.',404);
   if(sub.last_test_at&&Date.now()-Date.parse(sub.last_test_at)<30000)return fail('Aguarde 30 segundos para novo teste.',429);
-  await db.from('clyriva_client_push_subscriptions').update({last_test_at:new Date().toISOString()}).eq('endpoint',sub.endpoint).eq('user_id',uid);
-  await sender();const ok=await push(sub,{title:'Notificação de teste',body:'Clyriva Clientes está pronto para receber avisos.',tag:'teste-cliente',url:'/cliente.html'});
-  return ok?response({ok:true}):fail('O aparelho recusou a notificação.',502);
+  let claim=db.from('clyriva_client_push_subscriptions').update({last_test_at:new Date().toISOString()})
+   .eq('endpoint',sub.endpoint).eq('user_id',uid).eq('enabled',true);
+  claim=sub.last_test_at?claim.eq('last_test_at',sub.last_test_at):claim.is('last_test_at',null);
+  const {data:claimed,error:claimError}=await claim.select('endpoint').maybeSingle();
+  if(claimError)throw claimError;
+  if(!claimed)return fail('Confira a inscrição do aparelho e aguarde 30 segundos antes de testar novamente.',429);
+  await sender();
+  const ok=await push(sub,{title:'Notificação de teste',body:'Clyriva Clientes está pronto para receber avisos.',tag:'teste-cliente',url:'/cliente.html',testId});
+  return ok?response({ok:true,testId}):fail('O serviço de notificações não aceitou o teste. Confira a inscrição deste aparelho e tente novamente.',502);
  }
  return fail('Ação não encontrada.',404);
 }
