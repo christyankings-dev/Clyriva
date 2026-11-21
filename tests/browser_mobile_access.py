@@ -1,6 +1,5 @@
 """Login instalado, inscrição e teste de um único aparelho com serviços fictícios."""
 import json
-import socket
 import sys
 import threading
 from http.server import ThreadingHTTPServer
@@ -59,10 +58,7 @@ class MobileHandler(Handler):
         if path in scripts:
             return self.send(200,scripts[path].encode(),"text/javascript",{})
         if path=="/cliente.html" and self.server.simulate_outage.is_set():
-            # Cortar só o servidor fictício, mantendo o Chromium e o worker em funcionamento.
-            self.close_connection=True
-            self.connection.shutdown(socket.SHUT_RDWR)
-            return
+            return self.send(503,b"Servidor de teste indisponivel","text/plain",{})
         super().do_GET()
 
 
@@ -174,11 +170,17 @@ def service_worker(browser, origin, server):
       const msgs=await r.getNotifications();
       return msgs.some(n=>n.title==='Clyriva · Notificação de teste' && n.data.url==='/cliente.html');
     }""",timeout=10000)
+    cdp.detach()
     page.wait_for_function("""async()=>navigator.serviceWorker.controller && !!(await caches.match('/offline.html'))""")
-    server.simulate_outage.set()
-    page.goto(origin+"/cliente.html",wait_until="domcontentloaded")
+    # Entrar pelo link, como no celular. O servidor mantém os demais recursos disponíveis.
+    page.goto(origin+"/offline.html")
     reconnect=page.get_by_role("link",name="Abrir Clyriva Clientes")
     expect(reconnect).to_be_visible()
+    server.simulate_outage.set()
+    with page.expect_response(lambda r:r.url==origin+"/cliente.html" and r.request.is_navigation_request()) as navigation:
+        reconnect.click()
+    assert navigation.value.from_service_worker
+    expect(page.get_by_role("heading",name="Sem conexão com o Clyriva")).to_be_visible()
     server.simulate_outage.clear()
     reconnect.click()
     expect(page.locator("#client-login")).to_be_visible()

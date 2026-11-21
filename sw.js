@@ -3,6 +3,19 @@ const CACHE='clyriva-shell-v3';
 const STATIC=['/offline.html','/icons/clyriva-192.png','/icons/clyriva-512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(STATIC)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',event=>{event.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('clyriva-shell-')&&k!==CACHE).map(k=>caches.delete(k)))),self.clients.claim()]));});
-self.addEventListener('fetch',event=>{const req=event.request;if(req.mode!=='navigate'||req.method!=='GET')return;event.respondWith(fetch(req).catch(async()=>{return await caches.match('/offline.html')||new Response('Sem conexão',{status:503});}));});
+async function openPage(request){
+ let upstream;
+ try{
+  upstream=await fetch(request);
+  if(![502,503,504].includes(upstream.status))return upstream;
+ }catch{
+  // O navegador pode perder a conexão antes de receber qualquer status.
+ }
+ return await caches.match('/offline.html')||upstream||new Response('Sem conexão. Reconecte o aparelho e atualize a página.',{status:503});
+}
+self.addEventListener('fetch',event=>{
+ const request=event.request;
+ if(request.method==='GET'&&request.mode==='navigate')event.respondWith(openPage(request));
+});
 self.addEventListener('push',event=>{let d={};try{d=event.data?.json()||{};}catch{};const title='Clyriva · '+(typeof d.title==='string'?d.title:'Lembrete');const body=typeof d.body==='string'?d.body:'Abra o Clyriva para verificar suas pendências.';event.waitUntil(self.registration.showNotification(title,{body,icon:'/icons/clyriva-192.png',badge:'/icons/clyriva-192.png',tag:'clyriva-'+(d.tag||'gestao'),renotify:false,data:{url:d.url==='/cliente.html'?'/cliente.html':'/'}}));});
 self.addEventListener('notificationclick',event=>{event.notification.close();event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(async clients=>{const href=event.notification.data?.url==='/cliente.html'?'/cliente.html':'/';const url=new URL(href,self.location.origin);for(const client of clients){if(new URL(client.url).origin===url.origin&&new URL(client.url).pathname===href){await client.focus();return;}}await self.clients.openWindow(url.href);}));});
