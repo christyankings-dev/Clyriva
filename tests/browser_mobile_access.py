@@ -1,5 +1,6 @@
 """Login instalado, inscrição e teste de um único aparelho com serviços fictícios."""
 import json
+import socket
 import sys
 import threading
 from http.server import ThreadingHTTPServer
@@ -51,14 +52,22 @@ Object.defineProperty(window,'Notification',{configurable:true,value:{
 Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{model.copied=value;}}});
 """
 
-def app_scripts(context):
-    context.route("**/config.js", lambda route: route.fulfill(content_type="text/javascript", body=CONFIG))
-    context.route("**/vendor/supabase.js", lambda route: route.fulfill(content_type="text/javascript", body=AUTH))
+class MobileHandler(Handler):
+    def do_GET(self):
+        path=self.path.split("?",1)[0]
+        scripts={"/config.js":CONFIG,"/vendor/supabase.js":AUTH}
+        if path in scripts:
+            return self.send(200,scripts[path].encode(),"text/javascript",{})
+        if path=="/cliente.html" and self.server.simulate_outage.is_set():
+            # Cortar só o servidor fictício, mantendo o Chromium e o worker em funcionamento.
+            self.close_connection=True
+            self.connection.shutdown(socket.SHUT_RDWR)
+            return
+        super().do_GET()
 
 
 def onboarding(browser, origin):
     ctx = browser.new_context(viewport={"width":390,"height":844}, is_mobile=True, has_touch=True)
-    app_scripts(ctx)
     ctx.add_init_script(HANDSET)
     enrolled = set()
     attempts = []
@@ -144,9 +153,8 @@ def onboarding(browser, origin):
     print("OK convite por empresa, instalação antes de entrar, senha, permissão e teste individual; acesso legado preservado")
 
 
-def service_worker(browser, origin):
+def service_worker(browser, origin, server):
     ctx=browser.new_context(permissions=["notifications"])
-    app_scripts(ctx)
     page=ctx.new_page()
     cdp=ctx.new_cdp_session(page)
     registrations={}
@@ -166,11 +174,12 @@ def service_worker(browser, origin):
       const msgs=await r.getNotifications();
       return msgs.some(n=>n.title==='Clyriva · Notificação de teste' && n.data.url==='/cliente.html');
     }""",timeout=10000)
-    ctx.set_offline(True)
-    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function("""async()=>navigator.serviceWorker.controller && !!(await caches.match('/offline.html'))""")
+    server.simulate_outage.set()
+    page.goto(origin+"/cliente.html",wait_until="domcontentloaded")
     reconnect=page.get_by_role("link",name="Abrir Clyriva Clientes")
     expect(reconnect).to_be_visible()
-    ctx.set_offline(False)
+    server.simulate_outage.clear()
     reconnect.click()
     expect(page.locator("#client-login")).to_be_visible()
     ctx.close()
@@ -178,7 +187,8 @@ def service_worker(browser, origin):
 
 
 if __name__ == "__main__":
-    with ThreadingHTTPServer(("127.0.0.1",0),Handler) as server:
+    with ThreadingHTTPServer(("127.0.0.1",0),MobileHandler) as server:
+        server.simulate_outage=threading.Event()
         thread=threading.Thread(target=server.serve_forever,daemon=True)
         thread.start()
         try:
@@ -186,7 +196,7 @@ if __name__ == "__main__":
                 browser=pw.chromium.launch(executable_path="/usr/bin/chromium",args=["--no-sandbox","--disable-dev-shm-usage"])
                 origin=f"http://127.0.0.1:{server.server_port}"
                 onboarding(browser,origin)
-                service_worker(browser,origin)
+                service_worker(browser,origin,server)
                 browser.close()
         finally:
             server.shutdown()
