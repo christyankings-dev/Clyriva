@@ -1,15 +1,16 @@
-import { summaryContent } from './content.js';
-import { button, element } from '../elements.js';
-import { printSummary, summaryArticle } from './print.js';
+import { summaryContent } from './content.ts';
+import { button, element } from '../elements.ts';
+import { printSummary, summaryArticle } from './print.ts';
+import type { SummaryInfo, SummaryOptions } from '../types.ts';
 
-function closeSummary() {
-  const current = document.querySelector('#resumo-mensal');
+function closeSummary(): void {
+  const current = document.querySelector<HTMLDialogElement>('#resumo-mensal');
   if (!current) return;
   if (current.open) current.close();
   current.remove();
 }
 
-function showSummary(info, month, options) {
+function showSummary(info: SummaryInfo, month: string, options?: SummaryOptions): void {
   closeSummary();
   const model = summaryContent(info, month, options);
   const dialog = element('dialog', 'routine-dialog');

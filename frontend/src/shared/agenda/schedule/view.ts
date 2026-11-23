@@ -1,5 +1,6 @@
-import { matches, openItems, relativeDay } from './selectors.js';
-import { button, element } from '../elements.js';
+import { matches, openItems, relativeDay } from './selectors.ts';
+import { button, element } from '../elements.ts';
+import type { AgendaItem, AgendaOptions, AgendaView, DocumentRecord } from '../types.ts';
 import {
   brl,
   dateLabel,
@@ -9,9 +10,15 @@ import {
   monthLabel,
   pageSize,
   ranges,
-} from '../calendar.js';
+} from '../calendar.ts';
 
-function documentLabel(doc) {
+interface AgendaRow {
+  item: AgendaItem;
+  days: number | null;
+  doc?: DocumentRecord;
+}
+
+function documentLabel(doc?: DocumentRecord): string {
   if (!doc) return '';
   if (doc.status === 'archived') return 'Arquivada no app';
   if (doc.status === 'internal')
@@ -20,10 +27,15 @@ function documentLabel(doc) {
   return doc.files ? 'Publicada com anexo' : 'Publicada · sem anexo na ficha';
 }
 
-function mountAgenda(host, { taxes, tasks, companyName, onAction, loadDocuments }, view) {
+function mountAgenda(
+  host: HTMLElement,
+  { taxes, tasks, companyName, onAction, loadDocuments }: AgendaOptions,
+  view: AgendaView,
+): () => void {
   const items = openItems(taxes, tasks, companyName);
-  const key = (item) => JSON.stringify([item.clientId, item.type, item.id]);
-  let documents,
+  const key = (item: { clientId: string; type: string; id: string }) =>
+    JSON.stringify([item.clientId, item.type, item.id]);
+  let documents: Map<string, DocumentRecord> | undefined,
     loading = false,
     failed = false,
     refreshPending = false;
@@ -51,7 +63,7 @@ function mountAgenda(host, { taxes, tasks, companyName, onAction, loadDocuments 
   label.append(select);
   head.append(heading, label);
   const cards = element('div', 'routine-cards');
-  const counters = new Map();
+  const counters = new Map<string, { card: HTMLButtonElement; number: HTMLElement }>();
   for (const [id, text] of options.filter(
     ([id]) => !['attention', 'all', 'archived'].includes(id),
   )) {
@@ -80,13 +92,13 @@ function mountAgenda(host, { taxes, tasks, companyName, onAction, loadDocuments 
   more.id = 'agenda-mais';
   foot.append(count, more);
   host.replaceChildren(head, cards, feedback, list, foot);
-  function choose(range) {
+  function choose(range: string): void {
     view.range = range;
     view.limit = pageSize;
     select.value = range;
     draw();
   }
-  function rowFor({ item, days, doc }) {
+  function rowFor({ item, days, doc }: AgendaRow): HTMLLIElement {
     const row = element('li', 'routine-date');
     const due = element('div', 'routine-due');
     const color = days === null ? '' : days < 0 ? ' is-late' : days === 0 ? ' is-today' : '';
@@ -107,12 +119,12 @@ function mountAgenda(host, { taxes, tasks, companyName, onAction, loadDocuments 
     row.append(due, details);
     if (onAction) {
       const acts = element('div', 'routine-actions');
-      function action(label, verb, id) {
+      const action = (label: string, verb: string, id: string): void => {
         const act = button(label, 'routine-link');
         act.setAttribute('aria-label', label + ' — ' + item.title + ' — ' + item.company);
         act.onclick = () => onAction(verb, id, item.competence);
         acts.append(act);
-      }
+      };
       action('Abrir ficha', 'view-client', item.clientId);
       if (doc) {
         action(doc.files ? 'Documentos' : 'Anexar', 'docs-' + item.type, item.id);
@@ -129,9 +141,9 @@ function mountAgenda(host, { taxes, tasks, companyName, onAction, loadDocuments 
     }
     return row;
   }
-  function draw() {
+  function draw(): void {
     const today = Date.parse(localDate() + 'T00:00:00Z');
-    const rows = items.map((item) => ({
+    const rows: AgendaRow[] = items.map((item) => ({
       item,
       days: item.due ? (Date.parse(item.due + 'T00:00:00Z') - today) / dayMs : null,
       doc: documents?.get(key(item)),
@@ -164,7 +176,7 @@ function mountAgenda(host, { taxes, tasks, companyName, onAction, loadDocuments 
     more.hidden = shown.length >= visible.length;
   }
   let mounted = true;
-  async function refresh() {
+  async function refresh(): Promise<void> {
     if (!loadDocuments) return;
     if (loading) {
       refreshPending = true;

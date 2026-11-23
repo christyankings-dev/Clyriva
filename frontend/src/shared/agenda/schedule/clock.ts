@@ -1,10 +1,10 @@
-import { localDate } from '../calendar.js';
-import { closeSummary } from '../summary/dialog.js';
+import { localDate } from '../calendar.ts';
+import { closeSummary } from '../summary/dialog.ts';
 
-let dateTimer,
+let dateTimer: ReturnType<typeof setTimeout> | undefined,
   lastDay = localDate();
 
-function refreshDate() {
+function refreshDate(): void {
   clearTimeout(dateTimer);
   if (document.hidden) return;
   const day = localDate();

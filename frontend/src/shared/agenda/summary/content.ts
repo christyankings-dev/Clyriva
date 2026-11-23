@@ -1,7 +1,12 @@
-import { brl, cents, cleanText, dateLabel, localDate, monthLabel } from '../calendar.js';
-import { openItems } from '../schedule/selectors.js';
+import { brl, cents, cleanText, dateLabel, localDate, monthLabel } from '../calendar.ts';
+import { openItems } from '../schedule/selectors.ts';
+import type { SummaryInfo, SummaryModel, SummaryOptions, SummarySection } from '../types.ts';
 
-function summaryContent({ client, invoices, taxes, tasks }, month, { demo, publishedAt } = {}) {
+function summaryContent(
+  { client, invoices, taxes, tasks }: SummaryInfo,
+  month: string,
+  { demo, publishedAt }: SummaryOptions = {},
+): SummaryModel {
   const issued = invoices.filter((x) => x.competence === month && x.status === 'issued');
   const guides = taxes.filter((x) => x.competence === month);
   const work = tasks.filter((x) => x.competence === month);
@@ -18,7 +23,7 @@ function summaryContent({ client, invoices, taxes, tasks }, month, { demo, publi
   const guideTotal = guides
     .filter((x) => x.status !== 'paid')
     .reduce((total, g) => total + cents(g.value), 0);
-  const sections = [
+  const sections: SummarySection[] = [
     {
       title: 'Notas fiscais',
       lines: [
@@ -30,7 +35,7 @@ function summaryContent({ client, invoices, taxes, tasks }, month, { demo, publi
     },
   ];
   const open = openItems(guides, work);
-  const deadline = (item, word) =>
+  const deadline = (item: { due: string }, word: string): string =>
     item.due ? word + ' ' + dateLabel(item.due) : 'sem prazo registrado';
   const openGuides = open.filter((x) => x.type === 'tax');
   const openTasks = open.filter((x) => x.type === 'task');

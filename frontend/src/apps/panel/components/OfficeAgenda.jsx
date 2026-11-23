@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
-import { mountAgenda } from '../../../shared/agenda/index.js';
-import { validMonth } from '../../../shared/domain/workspace.js';
+import { mountAgenda } from '../../../shared/agenda/index.ts';
+import { validMonth } from '../../../shared/domain/workspace.ts';
 import { internalDocsApi } from '../documents/api.js';
 import { handleAction } from '../navigation/actions.js';
 import { agendaState, demoMode, state } from '../state/filters.js';

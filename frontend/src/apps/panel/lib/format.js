@@ -1,4 +1,4 @@
-import * as workspaceRules from '../../../shared/domain/workspace.js';
+import * as workspaceRules from '../../../shared/domain/workspace.ts';
 
 const $ = (s) => document.querySelector(s);
 

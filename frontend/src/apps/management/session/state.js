@@ -1,4 +1,4 @@
-import * as officeAgenda from '../../../shared/agenda/index.js';
+import * as officeAgenda from '../../../shared/agenda/index.ts';
 import { blank, ym } from './format.js';
 
 let epoch = 0;

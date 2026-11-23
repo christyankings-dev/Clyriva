@@ -12,7 +12,7 @@ ADMIN = source_text('apps/notices')
 
 class IntegrityV25(unittest.TestCase):
     def test_cpf_verifier_and_panel(self):
-        assert_js(self, "function validCpf(value)", CORE)
+        assert_js(self, "function validCpf(value", CORE)
         assert_js(self, "validCpf, validDate", CORE)
         assert_js(self, "if(!validCpf(cleaned)&&!validCnpj(cleaned))", PANEL)
         assert_js(self, "values.value<0", PANEL)

@@ -1,4 +1,4 @@
-import * as officeAgenda from '../../../shared/agenda/index.js';
+import * as officeAgenda from '../../../shared/agenda/index.ts';
 import { currentMonth } from '../lib/format.js';
 
 const rotina = officeAgenda;

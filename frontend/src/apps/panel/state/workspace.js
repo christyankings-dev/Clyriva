@@ -1,4 +1,4 @@
-import * as workspaceRules from '../../../shared/domain/workspace.js';
+import * as workspaceRules from '../../../shared/domain/workspace.ts';
 import { KEY, VAULT_KEY } from './storage.js';
 
 const core = workspaceRules;

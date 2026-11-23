@@ -1,4 +1,4 @@
-import * as workspaceRules from '../domain/workspace.js';
+import * as workspaceRules from '../domain/workspace.ts';
 
 const { brl, cents, validDate, monthLabel, dateLabel } = workspaceRules;
 
@@ -6,7 +6,7 @@ const byText = new Intl.Collator('pt-BR', {
   numeric: true,
 });
 
-const ranges = [
+const ranges: [string, string][] = [
   ['attention', 'Atrasados e próximos 7 dias'],
   ['late', 'Atrasados'],
   ['today', 'Hoje'],
@@ -33,11 +33,11 @@ const brazilCalendar = new Intl.DateTimeFormat('sv-SE', {
   day: '2-digit',
 });
 
-function localDate() {
+function localDate(): string {
   return brazilCalendar.format(new Date());
 }
 
-function cleanText(value) {
+function cleanText(value: unknown): string {
   return String(value ?? '')
     .replace(/\s+/g, ' ')
     .trim();

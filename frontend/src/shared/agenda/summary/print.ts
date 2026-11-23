@@ -1,4 +1,5 @@
-import { element } from '../elements.js';
+import { element } from '../elements.ts';
+import type { SummaryModel } from '../types.ts';
 
 const printStyle = `@page {size:A4;margin:17mm}
     body{font:11pt/1.55 Arial,sans-serif;margin:0;color:#183641}
@@ -9,7 +10,7 @@ const printStyle = `@page {size:A4;margin:17mm}
     ul{list-style:none;margin:5pt 0;padding:0}li{border-bottom:1px solid #dbe8e5;padding:3pt 0;break-inside:avoid}
     .routine-summary-note,footer{font-size:9pt}article{overflow-wrap:anywhere}footer{margin-top:15pt}`;
 
-function summaryArticle(model) {
+function summaryArticle(model: SummaryModel): HTMLElement {
   const article = element('article', 'routine-summary-sheet');
   const header = element('header');
   header.append(element('h1', '', model.name), element('p', '', model.header));
@@ -26,7 +27,7 @@ function summaryArticle(model) {
   return article;
 }
 
-function printSummary(dialog, model, article) {
+function printSummary(dialog: HTMLDialogElement, model: SummaryModel, article: HTMLElement): void {
   let frame = dialog.querySelector('iframe');
   if (!frame) {
     frame = element('iframe', 'routine-print-frame');
@@ -35,13 +36,16 @@ function printSummary(dialog, model, article) {
     frame.setAttribute('aria-hidden', 'true');
     dialog.append(frame);
     const doc = frame.contentDocument;
+    if (!doc) return;
     doc.documentElement.lang = 'pt-BR';
     doc.title = model.header + ' — ' + model.name;
     doc.head.append(element('style', '', printStyle));
     doc.body.append(doc.importNode(article, true));
   }
-  frame.contentWindow.focus();
-  frame.contentWindow.print();
+  const view = frame.contentWindow;
+  if (!view) return;
+  view.focus();
+  view.print();
 }
 
 export { printSummary, summaryArticle };
