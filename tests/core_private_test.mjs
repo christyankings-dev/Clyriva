@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import * as core from '../frontend/src/domain/workspace.js';
+import * as core from '../frontend/src/shared/domain/workspace.js';
 assert.strictEqual(core.cents('1.05'),105);
 assert.strictEqual(core.validCpf('529.982.247-25'),true);
 assert.strictEqual(core.validCpf('111.444.777-35'),true);

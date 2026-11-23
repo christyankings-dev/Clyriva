@@ -3,7 +3,7 @@ import unittest
 from built_site import assert_js, source_text
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-panel=source_text('panel')
+panel=source_text('apps/panel')
 edge=(ROOT/'edge-functions/clyriva-client/index.ts').read_text()
 html=(ROOT/'dist/admin.html').read_text()
 migration=(ROOT/'db/migrations/20261120_v24_internal_documents.sql').read_text()

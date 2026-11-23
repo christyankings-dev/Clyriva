@@ -4,13 +4,13 @@ from pathlib import Path
 import re, unittest
 ROOT=Path(__file__).resolve().parents[1]
 EDGE=(ROOT/'edge-functions/clyriva-client/index.ts').read_text()
-CLIENT=source_text('client')
-ADMIN=source_text('notices')
+CLIENT=source_text('apps/client')
+ADMIN=source_text('apps/notices')
 DB=(ROOT/'db/migrations/20261120_v22_reliability.sql').read_text()
 
 class AuditV22(unittest.TestCase):
     def test_no_service_worker_dependency_for_login(self):
-        login=source_text('client/auth/signIn.js')
+        login=source_text('apps/client/auth/signIn')
         self.assertNotIn('if(!registration)return',login)
         self.assertIn('sb.auth.signInWithPassword',login)
         self.assertIn('clearClientScreen()',login)

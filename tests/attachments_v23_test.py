@@ -8,8 +8,8 @@ class DocumentsV23(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     cls.edge=(ROOT/'edge-functions/clyriva-client/index.ts').read_text()
-    cls.admin=source_text('notices')
-    cls.client=source_text('client')
+    cls.admin=source_text('apps/notices')
+    cls.client=source_text('apps/client')
     cls.migration=(ROOT/'db/migrations/20261120_v23_private_attachments.sql').read_text()
   def test_bucket_private_and_mime_restricted(self):
     self.assertIn("false,5242880,array['application/pdf','image/jpeg','image/png']",self.migration)

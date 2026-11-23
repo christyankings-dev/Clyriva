@@ -4,10 +4,10 @@ from built_site import assert_js, source_text
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PANEL = source_text('panel')
-CORE = source_text('domain/workspace.js')
+PANEL = source_text('apps/panel')
+CORE = source_text('shared/domain/workspace')
 EDGE = (ROOT / "edge-functions/clyriva-client/index.ts").read_text()
-ADMIN = source_text('notices')
+ADMIN = source_text('apps/notices')
 
 
 class IntegrityV25(unittest.TestCase):

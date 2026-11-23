@@ -16,7 +16,7 @@ class ChargeRemindersTests(unittest.TestCase):
         self.assertIn(b'name="dueDate"',data)
         self.assertIn(b'charge-cancel-edit',data)
     def test_admin_flows(self):
-        js=source_text('notices')
+        js=source_text('apps/notices')
         assert_js(self, "api(isEdit?'update-charge':'create-charge'",js)
         assert_js(self, "api('mark-paid'",js)
         assert_js(self, "api('reopen-charge'",js)
@@ -25,7 +25,7 @@ class ChargeRemindersTests(unittest.TestCase):
         status,data,*_=servidor.resource('/cliente.html','127.0.0.1')
         self.assertEqual(status,200)
         self.assertIn(b'id="client-show-amount"',data)
-        js=source_text('client')
+        js=source_text('apps/client')
         assert_js(self, 'showAmount',js)
         assert_js(self, 'notice.amount_cents',js)
     def test_migration_no_public_push_subscriptions(self):
