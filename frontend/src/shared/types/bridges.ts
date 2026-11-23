@@ -34,3 +34,9 @@ export interface PushTestStore {
   mark(id: string, state: string, time?: number): Promise<PushTestRow | null>;
   forget(id: string): Promise<null>;
 }
+
+/** Evento nativo do Chrome/Android que oferece a instalação do aplicativo. */
+export interface InstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}

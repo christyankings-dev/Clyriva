@@ -1,12 +1,6 @@
-import type { PushTestRow } from '../../../shared/types/bridges.ts';
+import type { InstallPromptEvent, PushTestRow } from '../../../shared/types/bridges.ts';
 
 const CLIENT_SCOPE = '/cliente.html';
-
-/** Evento nativo do Chrome/Android que oferece a instalação do aplicativo. */
-interface InstallPromptEvent extends Event {
-  prompt(): Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
 
 const clientActivity: {
   deferred: InstallPromptEvent | null;
@@ -45,4 +39,3 @@ const pushReceipt: {
 };
 
 export { CLIENT_SCOPE, clientActivity, clientDevice, pushReceipt };
-export type { InstallPromptEvent };

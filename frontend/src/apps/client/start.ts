@@ -5,7 +5,7 @@ import { must } from '../../shared/lib/dom.ts';
 import { signIn } from './auth/signIn.ts';
 import { refresh } from './billing/refresh.ts';
 import { status } from './view.ts';
-import type { InstallPromptEvent } from './device/state.ts';
+import type { InstallPromptEvent } from '../../shared/types/bridges.ts';
 import { clientActivity, clientDevice, pushReceipt } from './device/state.ts';
 import { disable, enable, test } from './device/notifications.ts';
 import { install, installFeedback, updateInstall } from './device/install.ts';

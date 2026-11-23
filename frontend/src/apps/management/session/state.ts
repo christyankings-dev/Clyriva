@@ -1,5 +1,6 @@
 import * as officeAgenda from '../../../shared/agenda/index.ts';
-import { blank, ym } from './format.js';
+import type { SessionState } from '../types.ts';
+import { blank, ym } from './format.ts';
 
 let epoch = 0;
 
@@ -17,11 +18,11 @@ const recovery = {
   recovering: false,
 };
 
-const redirectURL = () => new URL(location.pathname, location.href).href;
+const redirectURL = (): string => new URL(location.pathname, location.href).href;
 
 const rotina = officeAgenda;
 
-const state = {
+const state: SessionState = {
   mode: 'login',
   user: null,
   adminPayload: blank(),
@@ -37,7 +38,7 @@ const state = {
   authBusy: false,
 };
 
-function discard() {
+function discard(): void {
   rotina.closeSummary();
   epoch++;
   sessionVersion.routeGeneration++;
@@ -57,14 +58,19 @@ function discard() {
   });
 }
 
-function assertCurrent(token) {
+/** O número da época muda a cada saída da sessão; operações antigas deixam de valer. */
+function currentEpoch(): number {
+  return epoch;
+}
+
+function assertCurrent(token: number): void {
   if (token !== epoch) throw Error('A sessão mudou. Entre novamente para continuar.');
 }
 
 export {
   assertCurrent,
+  currentEpoch,
   discard,
-  epoch,
   recovery,
   recoveryRequest,
   redirectURL,

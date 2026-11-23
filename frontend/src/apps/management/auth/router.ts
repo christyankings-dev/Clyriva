@@ -1,40 +1,39 @@
-import { $, root, sb } from '../session/config.js';
-import { errMsg, esc } from '../session/format.js';
+import { sb } from '../session/config.ts';
+import { errMsg } from '../session/format.ts';
+import { showFailure, showLogin, showReset } from '../session/screen.ts';
 import {
+  currentEpoch,
   discard,
-  epoch,
   recovery,
   recoveryRequest,
   sessionVersion,
   state,
-} from '../session/state.js';
-import { authPage, resetPasswordPage } from './forms.js';
-import { loadAdmin } from '../workspace/load.js';
+} from '../session/state.ts';
+import { loadAdmin } from '../workspace/load.ts';
 
-function accessFailure(e) {
-  root.innerHTML =
-    '<div class="login-main" style="min-height:100vh"><div class="login-card"><h2>Não foi possível carregar seu acesso</h2><div class="notice err mt20">' +
-    esc(errMsg(e)) +
-    '</div><button id="retry" class="button mt20">Tentar novamente</button> <button id="signout" class="button secondary mt20">Sair</button></div></div>';
-  $('#retry').onclick = routeUser;
-  $('#signout').onclick = signout;
+function accessFailure(error: unknown, retry: () => void = () => void routeUser()): void {
+  showFailure(errMsg(error), retry);
 }
 
-async function routeUser() {
+async function routeUser(): Promise<void> {
   if (!sb || recovery.recovering) return;
   const generation = ++sessionVersion.routeGeneration,
-    token = epoch;
+    token = currentEpoch();
   try {
     const {
       data: { user },
       error,
     } = await sb.auth.getUser();
-    if (generation !== sessionVersion.routeGeneration || token !== epoch || recovery.recovering)
+    if (
+      generation !== sessionVersion.routeGeneration ||
+      token !== currentEpoch() ||
+      recovery.recovering
+    )
       return;
     if (error) throw error;
     if (!user) {
       discard();
-      authPage();
+      showLogin();
       return;
     }
     if (!user.email_confirmed_at) throw Error('Confirme seu e-mail antes de acessar o portal.');
@@ -44,7 +43,7 @@ async function routeUser() {
       .select('user_id')
       .eq('user_id', user.id)
       .maybeSingle();
-    if (generation !== sessionVersion.routeGeneration || token !== epoch) return;
+    if (generation !== sessionVersion.routeGeneration || token !== currentEpoch()) return;
     if (a.error) throw a.error;
     if (a.data) {
       await loadAdmin(user, token, generation);
@@ -54,7 +53,7 @@ async function routeUser() {
       'Acesso restrito à gestão do Clyriva. Solicite autorização ao administrador principal.',
     );
   } catch (e) {
-    if (generation === sessionVersion.routeGeneration && token === epoch) {
+    if (generation === sessionVersion.routeGeneration && token === currentEpoch()) {
       state.mode = 'error';
       state.frame = null;
       accessFailure(e);
@@ -62,12 +61,12 @@ async function routeUser() {
   }
 }
 
-async function signout() {
+async function signout(): Promise<void> {
   if (state.saving) return;
   discard();
   recoveryRequest.awaitingRecovery = false;
   recovery.recovering = false;
-  authPage();
+  showLogin();
   if (sb) {
     try {
       const { error } = await sb.auth.signOut({
@@ -77,18 +76,18 @@ async function signout() {
     } catch (e) {
       accessFailure(
         Error('Falha ao encerrar a sessão no provedor. Tente sair novamente. ' + errMsg(e)),
+        () => void signout(),
       );
-      $('#retry').onclick = signout;
     }
   }
 }
 
-function recoveryScreen() {
+function recoveryScreen(): void {
   discard();
   recoveryRequest.awaitingRecovery = false;
   recovery.recovering = true;
-  authPage();
-  resetPasswordPage();
+  showLogin();
+  showReset();
 }
 
 export { recoveryScreen, routeUser, signout };

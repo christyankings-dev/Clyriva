@@ -1,35 +1,34 @@
-import { sb } from './session/config.js';
-import { discard, recovery, recoveryRequest, state } from './session/state.js';
-import { authPage, statusMessage, wireLogin } from './auth/forms.js';
-import { recoveryScreen, routeUser } from './auth/router.js';
-import './session/pushBridge.js';
+import { routeUser, recoveryScreen } from './auth/router.ts';
+import { sb } from './session/config.ts';
+import { showLogin, statusMessage } from './session/screen.ts';
+import { discard, recovery, recoveryRequest, state } from './session/state.ts';
 
-window.addEventListener('pageshow', (e) => {
-  if (e.persisted && sb) {
-    discard();
-    authPage();
-    sb.auth.getSession().then(({ data }) => {
-      if (data.session && !recovery.recovering) routeUser();
-    });
-  }
-});
+/** Liga os eventos da página e da sessão do Supabase (roda uma vez, na abertura do portal). */
+export function boot(): void {
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted && sb) {
+      discard();
+      showLogin();
+      void sb.auth.getSession().then(({ data }) => {
+        if (data.session && !recovery.recovering) void routeUser();
+      });
+    }
+  });
 
-window.addEventListener('beforeunload', (e) => {
-  if (state.saving) {
-    e.preventDefault();
-    e.returnValue = '';
-  }
-});
+  window.addEventListener('beforeunload', (e) => {
+    if (state.saving) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
 
-function init() {
-  wireLogin();
   if (!sb) return;
   sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
       discard();
       recoveryRequest.awaitingRecovery = false;
       recovery.recovering = false;
-      authPage();
+      showLogin();
       return;
     }
     if (event === 'PASSWORD_RECOVERY') {
@@ -49,14 +48,12 @@ function init() {
     if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
       if (state.user && state.user.id !== session.user.id) {
         discard();
-        authPage();
+        showLogin();
       }
       if (!state.authBusy && state.mode === 'login')
         setTimeout(() => {
-          if (!recovery.recovering && state.mode === 'login') routeUser();
+          if (!recovery.recovering && state.mode === 'login') void routeUser();
         }, 0);
     }
   });
 }
-
-init();

@@ -1,23 +1,23 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import * as workspaceRules from '../../../shared/domain/workspace.ts';
-
-const $ = (s) => document.querySelector(s),
-  root = $('#root'),
-  loginMarkup = root.innerHTML;
+import { errorInfo } from '../../../shared/lib/errors.ts';
 
 const core = workspaceRules,
   config = window.CLYRIVA_CONFIG || {};
 
 const configured = Boolean(config.supabaseUrl || config.supabaseAnonKey);
 
-let sb = null,
+let sb: SupabaseClient | null = null,
   configError = '';
 
 if (configured) {
   try {
-    const url = new URL(config.supabaseUrl),
+    const url = new URL(config.supabaseUrl ?? ''),
       key = String(config.supabaseAnonKey || '').trim();
-    const loopback = (u) => ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname);
-    const safe = (u) => u.protocol === 'https:' || (u.protocol === 'http:' && loopback(u));
+    const loopback = (u: URL | Location) =>
+      ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname);
+    const safe = (u: URL | Location) =>
+      u.protocol === 'https:' || (u.protocol === 'http:' && loopback(u));
     if (!safe(url) || url.username || url.password || !safe(location))
       throw Error('Use HTTPS no portal e no projeto. Para testes locais, use localhost.');
     let isPublic = key.startsWith('sb_publishable_');
@@ -37,8 +37,8 @@ if (configured) {
       },
     });
   } catch (e) {
-    configError = e.message;
+    configError = errorInfo(e).message;
   }
 }
 
-export { $, configError, configured, core, loginMarkup, root, sb };
+export { configError, configured, core, sb };
