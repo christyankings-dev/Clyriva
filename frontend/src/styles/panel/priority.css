@@ -1,0 +1,58 @@
+/* Clyriva v1.2 · prioridades e cofre protegido */
+.priority-pill {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: #e8f5f2;
+  color: #286d63;
+}
+.priority-pill.p-critical {
+  background: #fde8e9;
+  color: #b53249;
+}
+.priority-pill.p-high {
+  background: #fff2de;
+  color: #a46b18;
+}
+.priority-pill.p-medium {
+  background: #e6f0ff;
+  color: #276b9d;
+}
+.priority-pill.p-low {
+  background: #eff3f4;
+  color: #697c80;
+}
+.priority-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.priority-overview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 16px 19px;
+  border: 1px solid #d6e7e5;
+  border-radius: 15px;
+  background: #eff8f6;
+  flex-wrap: wrap;
+}
+.priority-overview strong {
+  font-size: 13px;
+  color: #196a60;
+}
+.priority-overview span {
+  flex: 1;
+  color: #597780;
+}
+.priority-overview .btn {
+  flex: none;
+}

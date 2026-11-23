@@ -3,9 +3,9 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 
 // Exercita o manipulador de navegação publicado com rede e Cache Storage controlados.
-const source=await readFile(new URL('../sw.js',import.meta.url),'utf8');
-const receiptSource=await readFile(new URL('../push-test.js',import.meta.url),'utf8');
-const offline=await readFile(new URL('../offline.html',import.meta.url),'utf8');
+const source=await readFile(new URL('../frontend/public/sw.js',import.meta.url),'utf8');
+const receiptSource=await readFile(new URL('../frontend/public/push-test.js',import.meta.url),'utf8');
+const offline=await readFile(new URL('../frontend/public/offline.html',import.meta.url),'utf8');
 const events=new Map();
 let result, cached;
 const origin='https://example.test';

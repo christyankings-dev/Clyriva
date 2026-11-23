@@ -1,0 +1,75 @@
+/* Consulta automática CNPJ (v1.1) */
+.cnpj-lookup-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cnpj-lookup-row input {
+  min-width: 0;
+  flex: 1;
+}
+.cnpj-lookup-row .cnpj-search-btn {
+  flex: none;
+  white-space: nowrap;
+  background: #e7f6f2;
+  border-color: #bbddd5;
+  color: #0c7467;
+}
+#cnpj-lookup-status {
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 9px 0 0;
+  color: #6f8994;
+  min-height: 16px;
+}
+#cnpj-lookup-status:empty {
+  margin: 0;
+  min-height: 0;
+}
+#cnpj-lookup-status[data-kind='good'] {
+  color: #0e8063;
+}
+#cnpj-lookup-status[data-kind='bad'] {
+  color: #bc4559;
+}
+#cnpj-lookup-status[data-kind='warn'] {
+  color: #a8782c;
+}
+.cnpj-extra {
+  border: 1px solid #e0ecea;
+  border-radius: 12px;
+  padding: 14px 15px;
+  background: #f8fbfa;
+}
+.cnpj-extra summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  color: #2c5a59;
+}
+.cnpj-extra-grid {
+  margin-top: 17px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.cnpj-extra .cnpj-source {
+  margin: 11px 0 0;
+  color: #849da3;
+  font-size: 10px;
+  line-height: 1.55;
+}
+@media (max-width: 600px) {
+  .cnpj-lookup-row {
+    flex-wrap: wrap;
+  }
+  .cnpj-lookup-row .cnpj-search-btn {
+    width: 100%;
+  }
+  .cnpj-extra-grid {
+    grid-template-columns: 1fr;
+  }
+  .cnpj-extra-grid .field.wide {
+    grid-column: span 1;
+  }
+}

@@ -1,0 +1,61 @@
+/* Clyriva 1.8 | Identidade editorial clara para uma carteira compacta.
+ * Apenas apresentação: nenhuma dependência externa, nenhuma mudança no armazenamento. */
+:root {
+  --navy: #0f2c36;
+  --navy2: #183b43;
+  --ink: #192e38;
+  --soft: #5b6f7a;
+  --muted: #637c85;
+  --teal: #087f75;
+  --teal2: #087f75;
+  --line: #e3eaec;
+  --bg: #f5f9f8;
+  --panel: #fff;
+  --radius: 13px;
+  --shadow: 0 4px 22px rgba(15, 44, 54, 0.035);
+}
+html,
+body {
+  letter-spacing: 0 !important;
+  color: var(--ink);
+}
+*:focus-visible {
+  outline: 2px solid #0aa18f !important;
+  outline-offset: 3px !important;
+}
+button,
+input,
+textarea,
+select {
+  letter-spacing: 0 !important;
+}
+.btn,
+.button {
+  min-height: 42px;
+  border-radius: 9px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+.btn.small {
+  min-height: 36px;
+}
+.btn.primary,
+.button:not(.secondary):not(.danger):not(.link) {
+  background: #087f75;
+  border-color: #087f75;
+  color: white;
+}
+.btn.primary:hover,
+.button:not(.secondary):not(.danger):not(.link):hover {
+  background: #066a63;
+  border-color: #066a63;
+}
+.eyebrow,
+.side-label,
+.brand small,
+.breadcrumb,
+.table th {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 650;
+}

@@ -1,0 +1,86 @@
+.empty {
+  text-align: center;
+  padding: 60px 25px;
+  color: #93a4ac;
+}
+.empty-icon {
+  display: grid;
+  place-items: center;
+  margin: 0 auto 16px;
+  height: 56px;
+  width: 56px;
+  background: #edf5f3;
+  color: #0f8c80;
+  border-radius: 19px;
+  font-size: 28px;
+}
+.empty h3 {
+  font-size: 15px;
+  color: #2a4854;
+  margin: 0 0 6px;
+}
+.empty p {
+  font-size: 12px;
+  line-height: 1.7;
+  max-width: 390px;
+  margin: 0 auto 17px;
+}
+.progress {
+  height: 6px;
+  width: 100%;
+  background: #edf2f2;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 7px 0 0;
+}
+.progress b {
+  display: block;
+  background: #0d9c88;
+  height: 100%;
+  border-radius: 8px;
+}
+.notice {
+  padding: 14px 16px;
+  background: #fff9ed;
+  border: 1px solid #efe6d3;
+  color: #8d753e;
+  border-radius: 10px;
+  font-size: 11px;
+  line-height: 1.65;
+  margin-bottom: 18px;
+}
+.notice.blue {
+  background: #eff8f7;
+  border-color: #d7e9e5;
+  color: #497a75;
+}
+.notice.danger {
+  background: #fff3f3;
+  border-color: #f5d5d8;
+  color: #a44e58;
+}
+.tabbar {
+  display: flex;
+  gap: 4px;
+  background: #f1f5f5;
+  padding: 5px;
+  border-radius: 10px;
+  overflow: auto;
+  margin-bottom: 18px;
+  max-width: max-content;
+}
+.tabbar button {
+  background: transparent;
+  border: 0;
+  padding: 9px 13px;
+  border-radius: 7px;
+  font-weight: 780;
+  color: #879ca3;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.tabbar button.on {
+  background: #fff;
+  color: #087f75;
+  box-shadow: 0 2px 8px #0b2b3210;
+}

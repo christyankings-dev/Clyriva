@@ -1,0 +1,32 @@
+{
+  "name": "clyriva",
+  "version": "3.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "lint": "eslint frontend/src",
+    "format:check": "prettier --check frontend/src frontend/*.html vite.config.mjs",
+    "test": "node tests/core_private_test.mjs && node tests/reminder_rules_test.mjs && node tests/worker_navigation.mjs && node tests/edge_integration_v22.mjs"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@tailwindcss/vite": "4.3.5",
+    "@vitejs/plugin-react": "6.3.0",
+    "eslint": "9.39.5",
+    "eslint-plugin-react": "7.37.5",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.14.0",
+    "prettier": "3.10.1",
+    "tailwindcss": "4.3.5",
+    "vite": "8.3.8"
+  },
+  "type": "module"
+}

@@ -3,12 +3,13 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 import servidor
+from built_site import source_text
 
 class ClientPortalTests(unittest.TestCase):
     def test_public_client_login(self):
         code,b,mime,_=servidor.resource('/cliente.html','127.0.0.1')
         self.assertEqual(code,200)
-        self.assertIn(b'clyriva-client-auth-v2',(ROOT/'cliente.js').read_bytes())
+        self.assertIn('clyriva-client-auth-v2',source_text('client/api.js'))
         self.assertIn(b'client-login',b)
         self.assertNotIn(b'service_role',b.lower())
     def test_admin_publisher_page(self):
@@ -34,12 +35,11 @@ class ClientPortalTests(unittest.TestCase):
         self.assertIn(b'cliente.html',b)
         self.assertNotIn(b'localStorage',b)
     def test_authorized_only_for_client_notices(self):
-        code,b,_,_=servidor.resource('/avisos-admin.js','127.0.0.1')
-        self.assertEqual(code,200)
-        self.assertIn(b'clyriva_admins',b)
-        self.assertIn(b"'/admin-'+action",b)
-        self.assertIn(b"api('publish',data)",b)
-        portal=(ROOT/'cliente.js').read_text()
+        admin=source_text('notices')
+        self.assertIn('clyriva_admins',admin)
+        self.assertIn("'/admin-' + action",admin)
+        self.assertIn("api('publish', data)",admin)
+        portal=source_text('client')
         self.assertNotIn('clyriva_workspace',portal)
         self.assertNotIn('clyriva_vault',portal)
         self.assertIn('client-list',portal)

@@ -1,0 +1,182 @@
+/* Clyriva PWA: opcao de instalacao no portal, configuracao acessivel de notificacoes. */
+.clyriva-pwa-trigger {
+  position: fixed;
+  z-index: 9996;
+  right: 18px;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  padding: 12px 16px;
+  min-height: 46px;
+  background: #0f2c36;
+  color: white;
+  border: 1px solid #2b6866;
+  border-radius: 12px;
+  box-shadow: 0 8px 28px #0f2c3630;
+  font:
+    600 13px Inter,
+    'Segoe UI',
+    Arial,
+    sans-serif;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.clyriva-pwa-trigger:hover {
+  background: #087f75;
+}
+.clyriva-pwa-trigger:focus-visible,
+.clyriva-pwa-dialog button:focus-visible {
+  outline: 2px solid #0aa18f;
+  outline-offset: 3px;
+}
+.clyriva-pwa-overlay {
+  position: fixed;
+  z-index: 100005;
+  inset: 0;
+  background: #0f2c36b8;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.clyriva-pwa-dialog {
+  background: #fff;
+  border: 1px solid #e3eaec;
+  box-shadow: 0 12px 36px #0f2c3630;
+  border-radius: 16px;
+  width: min(100%, 480px);
+  padding: 28px;
+  color: #192e38;
+  font:
+    14px Inter,
+    'Segoe UI',
+    Arial,
+    sans-serif;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+.clyriva-pwa-dialog h2 {
+  font:
+    700 24px Inter,
+    'Segoe UI',
+    Arial,
+    sans-serif;
+  color: #0f2c36;
+  letter-spacing: 0;
+  margin: 4px 0 12px;
+}
+.clyriva-pwa-dialog p {
+  font:
+    400 14px/1.65 Inter,
+    'Segoe UI',
+    Arial,
+    sans-serif;
+  color: #5b6f7a;
+  letter-spacing: 0;
+  margin: 0 0 14px;
+}
+.clyriva-pwa-dialog .pwa-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.clyriva-pwa-dialog .pwa-mark {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 19px;
+  font-weight: 750;
+  color: #0f2c36;
+}
+.clyriva-pwa-dialog .pwa-mark img {
+  border-radius: 12px;
+}
+.clyriva-pwa-dialog .pwa-close {
+  background: transparent;
+  color: #0f2c36;
+  border: 0;
+  font-size: 24px;
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.clyriva-pwa-dialog .pwa-section {
+  border-top: 1px solid #e3eaec;
+  padding-top: 17px;
+  margin-top: 17px;
+}
+.clyriva-pwa-dialog h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f2c36;
+  letter-spacing: 0;
+  margin: 0 0 8px;
+}
+.clyriva-pwa-dialog .pwa-btn {
+  width: 100%;
+  min-height: 46px;
+  border-radius: 10px;
+  padding: 12px 15px;
+  border: 1px solid #087f75;
+  background: #087f75;
+  color: #fff;
+  font:
+    600 15px Inter,
+    'Segoe UI',
+    Arial,
+    sans-serif;
+  cursor: pointer;
+  margin-top: 8px;
+  letter-spacing: 0;
+}
+.clyriva-pwa-dialog .pwa-btn:hover {
+  background: #066a63;
+}
+.clyriva-pwa-dialog .pwa-btn.secondary {
+  background: white;
+  color: #087f75;
+  border-color: #9bbfbb;
+}
+.clyriva-pwa-dialog .pwa-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.clyriva-pwa-dialog .pwa-status {
+  background: #e4f5f1;
+  border-radius: 9px;
+  padding: 12px;
+  color: #0b6e52;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 14px 0;
+  min-height: 42px;
+  overflow-wrap: anywhere;
+}
+.clyriva-pwa-dialog .pwa-tips {
+  background: #f5f9f8;
+  padding: 12px;
+  border: 1px solid #e3eaec;
+  border-radius: 10px;
+}
+.clyriva-pwa-dialog .pwa-small {
+  font-size: 12px;
+  color: #5b6f7a;
+  line-height: 1.6;
+}
+@media (max-width: 520px) {
+  .clyriva-pwa-dialog {
+    padding: 20px;
+  }
+  .clyriva-pwa-trigger {
+    right: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .clyriva-pwa-trigger,
+  .clyriva-pwa-dialog {
+    transition: none;
+    animation: none;
+  }
+}

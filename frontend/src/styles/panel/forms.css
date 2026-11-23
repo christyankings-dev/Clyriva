@@ -1,0 +1,104 @@
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #10283299;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+}
+.modal {
+  width: min(100%, 640px);
+  max-height: 94vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 17px;
+  box-shadow: 0 20px 70px #0b283550;
+}
+.modal-head {
+  padding: 23px 25px 19px;
+  border-bottom: 1px solid #edf0f0;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.modal-head h2 {
+  font-size: 18px;
+  letter-spacing: -0.3px;
+  margin: 0 0 7px;
+}
+.modal-head p {
+  margin: 0;
+  color: #94a4ac;
+  font-size: 11px;
+}
+.modal-close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: #f1f5f5;
+  color: #668088;
+  border-radius: 8px;
+  font-size: 19px;
+}
+.modal-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  padding: 22px 25px;
+}
+.field {
+  min-width: 0;
+}
+.field.wide {
+  grid-column: span 2;
+}
+.field label {
+  display: block;
+  font-size: 11px;
+  color: #5c7481;
+  font-weight: 800;
+  margin-bottom: 7px;
+}
+.field label em {
+  font-style: normal;
+  color: #bc6771;
+}
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  border: 1px solid #dfe8e9;
+  border-radius: 9px;
+  padding: 11px 12px;
+  color: #274956;
+  background: #fff;
+  outline: 0;
+  font-size: 12px;
+  min-height: 40px;
+}
+.field textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  border-color: #5cbaa9;
+  box-shadow: 0 0 0 3px #e4f5f1;
+}
+.field .help {
+  display: block;
+  color: #94a3a9;
+  font-size: 10px;
+  line-height: 1.5;
+  margin-top: 5px;
+}
+.modal-foot {
+  padding: 17px 25px 22px;
+  border-top: 1px solid #edf1f1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

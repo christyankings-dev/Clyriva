@@ -1,0 +1,66 @@
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.table th {
+  background: #f9fbfb;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #95a3aa;
+  padding: 14px 17px;
+  white-space: nowrap;
+  font-weight: 850;
+}
+.table td {
+  font-size: 11px;
+  color: #415b65;
+  padding: 15px 17px;
+  border-top: 1px solid #eef2f3;
+  vertical-align: middle;
+}
+.table td strong {
+  color: #263e49;
+  font-size: 12px;
+}
+.table td small {
+  display: block;
+  color: #93a1a8;
+  margin-top: 5px;
+  font-size: 10px;
+}
+.table tr:hover td {
+  background: #fdfefe;
+}
+.table td:last-child {
+  white-space: nowrap;
+}
+.table .right,
+.right {
+  text-align: right;
+}
+.table .nobr {
+  white-space: nowrap;
+}
+.table-actions {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.money {
+  font-weight: 790;
+  color: #2b4450;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.money.good {
+  color: #16826e;
+}
+.money.bad {
+  color: #bb5060;
+}

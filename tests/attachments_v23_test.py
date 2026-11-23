@@ -1,4 +1,5 @@
 """Testes da estrutura do anexo privado (não usam dados reais)."""
+from built_site import assert_js, source_text
 from pathlib import Path
 import unittest
 ROOT=Path(__file__).resolve().parents[1]
@@ -7,8 +8,8 @@ class DocumentsV23(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     cls.edge=(ROOT/'edge-functions/clyriva-client/index.ts').read_text()
-    cls.admin=(ROOT/'avisos-admin.js').read_text()
-    cls.client=(ROOT/'cliente.js').read_text()
+    cls.admin=source_text('notices')
+    cls.client=source_text('client')
     cls.migration=(ROOT/'db/migrations/20261120_v23_private_attachments.sql').read_text()
   def test_bucket_private_and_mime_restricted(self):
     self.assertIn("false,5242880,array['application/pdf','image/jpeg','image/png']",self.migration)
@@ -28,19 +29,19 @@ class DocumentsV23(unittest.TestCase):
     self.assertNotIn('getPublicUrl(',self.edge)
   def test_upload_uses_signed_url_only(self):
     self.assertIn('createSignedUploadUrl(path)',self.edge)
-    self.assertIn('uploadToSignedUrl(start.path,start.token,file',self.admin)
-    self.assertIn('attachment-complete',self.admin)
+    assert_js(self, 'uploadToSignedUrl(start.path,start.token,file',self.admin)
+    assert_js(self, 'attachment-complete',self.admin)
   def test_admin_client_buttons(self):
     for t in ['Visualizar','Baixar','Adicionar documento','Remover']:
-      self.assertIn(t,self.admin)
-    self.assertIn('client-attachment-link',self.client)
+      assert_js(self, t,self.admin)
+    assert_js(self, 'client-attachment-link',self.client)
     self.assertIn('attachments:',self.edge)
   def test_no_document_in_push(self):
     self.assertIn('const GENERIC=',self.edge)
     self.assertIn('reminderText(current,stage',self.edge)
     self.assertNotIn('storage_path,admin_id,client_id',self.client)
   def test_notice_failure_does_not_duplicate_charge(self):
-    self.assertIn('f.dataset.editId=result.noticeId||payload.noticeId',self.admin)
-    self.assertIn('uploadAttachment(result.noticeId||payload.noticeId,file)',self.admin)
+    assert_js(self, 'f.dataset.editId=result.noticeId||payload.noticeId',self.admin)
+    assert_js(self, 'uploadAttachment(result.noticeId||payload.noticeId,file)',self.admin)
 
 if __name__=='__main__':unittest.main()

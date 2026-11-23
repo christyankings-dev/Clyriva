@@ -20,7 +20,7 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(int(res['headers']['Content-Length']),len(res['body']))
 
     def test_only_public_files(self):
-        for path in ('/schema.sql','/tests/banco.sql','/backup.json','/../config.js','/admin-setup.html','/file-demo.js', '/'+servidor.LOCAL_HTML):
+        for path in ('/schema.sql','/frontend/src/entries/panel.js','/src/panel/state/workspace.js','/assets/hide.js.map','/assets/../config.js','/tests/banco.sql','/backup.json','/../config.js','/admin-setup.html','/file-demo.js', '/'+servidor.LOCAL_HTML):
             self.assertEqual(self.request(path)['status'],404)
 
     def test_validation_before_lookup(self):

@@ -1,0 +1,72 @@
+.client-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.client-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  border-radius: 16px;
+  padding: 20px;
+  min-width: 0;
+}
+.client-row {
+  display: flex;
+  gap: 11px;
+  justify-content: space-between;
+}
+.client-avatar {
+  height: 42px;
+  width: 42px;
+  flex: none;
+  border-radius: 12px;
+  background: #ddf1ec;
+  color: #0a786c;
+  font-weight: 850;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+}
+.client-card h3 {
+  font-size: 14px;
+  margin: 13px 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.client-card p {
+  font-size: 10px;
+  color: #90a1a7;
+  margin: 0;
+}
+.client-card .facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  border-top: 1px solid #eef2f2;
+  border-bottom: 1px solid #eef2f2;
+  padding: 18px 0;
+  margin-top: 17px;
+}
+.client-card .facts span {
+  color: #94a4aa;
+  font-size: 9px;
+  display: block;
+  margin-bottom: 7px;
+}
+.client-card .facts strong {
+  font-size: 14px;
+  display: block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.client-card .card-actions {
+  display: flex;
+  gap: 7px;
+  margin-top: 15px;
+}
+.client-card .card-actions .btn {
+  flex: 1;
+}

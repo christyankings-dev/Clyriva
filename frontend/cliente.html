@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#0f2c36" />
+    <meta
+      name="description"
+      content="Avisos e notificações particulares da sua empresa no Clyriva."
+    />
+    <link rel="icon" href="/icons/clyriva-192.png" />
+    <link rel="apple-touch-icon" href="/icons/clyriva-192.png" />
+    <link rel="manifest" href="/manifest-cliente.webmanifest" />
+    <title>Clyriva Clientes · Avisos da sua empresa</title>
+    <script src="/config.js"></script>
+    <script src="/vendor/supabase.js"></script>
+    <script src="/push-test.js"></script>
+  </head>
+  <body>
+    <header class="header">
+      <div class="brand">
+        <img src="/icons/clyriva-192.png" alt="" /><span>Cly<em>riva</em></span
+        ><small class="badge">Clientes</small>
+      </div>
+      <a class="small" href="/">Área da gestão</a>
+    </header>
+    <main class="wrap">
+      <div id="login-area" class="card login">
+        <h1>Entrar no Clyriva Clientes</h1>
+        <p class="muted">
+          Use o e-mail autorizado pelo seu escritório para consultar os avisos e documentos da sua
+          empresa.
+        </p>
+        <form id="client-login">
+          <label class="label" for="c-email">Seu e-mail</label
+          ><input
+            class="field"
+            id="c-email"
+            type="email"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            required
+          />
+          <label class="label" for="c-password">Senha</label
+          ><input
+            class="field"
+            id="c-password"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
+          <button class="btn primary login-submit" type="submit">Entrar</button>
+        </form>
+        <div id="login-feedback" class="status" role="status" aria-live="polite"></div>
+        <details class="login-help">
+          <summary>Primeiro acesso ou esqueci minha senha</summary>
+          <p class="small">
+            Peça ao escritório para autorizar seu e-mail na empresa e enviar o acesso em particular.
+            Use a senha provisória na primeira entrada. Para receber uma nova, fale com o
+            escritório.
+          </p>
+        </details>
+        <div class="install-inline" data-install-area>
+          <button class="btn" data-client-install type="button">Instalar no celular</button>
+          <p class="small" data-install-feedback role="status">
+            Depois de instalar, abra o ícone Clyriva Clientes e entre com seu e-mail e senha.
+          </p>
+        </div>
+      </div>
+      <div id="client-area" class="hidden">
+        <div class="section-header">
+          <div>
+            <h1>Meu espaço</h1>
+            <p>Avisos e documentos das suas empresas.</p>
+          </div>
+          <button class="btn" id="client-logout" type="button">Sair da conta</button>
+        </div>
+        <section class="card device-card" aria-labelledby="device-heading">
+          <h2 id="device-heading">Notificações neste aparelho</h2>
+          <p id="device-status" class="device-status" role="status">Conferindo este aparelho…</p>
+          <div class="row device-actions">
+            <button class="btn primary" id="client-push-enable" type="button">
+              Ativar notificações
+            </button>
+            <button class="btn" id="client-push-test" type="button" disabled>
+              Enviar notificação de teste
+            </button>
+          </div>
+          <div id="push-feedback" class="status small" role="status" aria-live="polite"></div>
+          <p id="client-test-result" class="small" role="status" aria-live="polite" hidden></p>
+          <details>
+            <summary>Preferências de notificação</summary>
+            <p class="small">
+              Os lembretes de cobrança são programados para as 9h de Brasília, três, dois e um dia
+              antes e no vencimento.
+            </p>
+            <label class="push-consent"
+              ><input id="client-show-amount" type="checkbox" /> Mostrar o valor da cobrança na
+              notificação, inclusive com a tela bloqueada</label
+            >
+            <button class="btn" id="client-push-disable" type="button" disabled>
+              Desativar neste aparelho
+            </button>
+          </details>
+        </section>
+        <div id="client-feedback" class="status" role="status" aria-live="polite"></div>
+        <div class="split">
+          <section class="card">
+            <h2>Minhas cobranças e avisos</h2>
+            <div
+              class="summary-grid"
+              id="client-billing-overview"
+              aria-label="Resumo das cobranças"
+            ></div>
+            <label class="label" for="client-notice-filter">Visualizar cobranças e avisos</label>
+            <select class="field" id="client-notice-filter">
+              <option value="pending">Em aberto e comunicados</option>
+              <option value="paid">Pagos</option>
+              <option value="all">Todos os registros</option>
+            </select>
+            <div
+              id="client-notices"
+              aria-live="polite"
+              class="stack"
+              style="margin-top: 15px"
+            ></div>
+            <button class="btn" id="client-refresh" type="button" style="margin-top: 18px">
+              Atualizar avisos
+            </button>
+          </section>
+          <aside class="stack">
+            <section class="card" data-install-area>
+              <h2>Aplicativo no celular</h2>
+              <button id="client-install" class="btn" data-client-install type="button">
+                Instalar Clyriva Clientes
+              </button>
+              <p class="small" data-install-feedback role="status">
+                Abra o aplicativo pelo ícone da tela inicial após a instalação.
+              </p>
+            </section>
+            <section class="card">
+              <h2>Alterar minha senha</h2>
+              <form id="client-password-form">
+                <label class="label" for="client-new-password">Nova senha (12+ caracteres)</label
+                ><input
+                  class="field"
+                  type="password"
+                  id="client-new-password"
+                  name="newPassword"
+                  minlength="12"
+                  autocomplete="new-password"
+                  required
+                />
+                <label class="label" for="client-confirm-password">Confirme a nova senha</label
+                ><input
+                  class="field"
+                  type="password"
+                  id="client-confirm-password"
+                  name="confirmPassword"
+                  minlength="12"
+                  autocomplete="new-password"
+                  required
+                />
+                <button class="btn" type="submit" style="margin-top: 13px">
+                  Atualizar minha senha
+                </button>
+              </form>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/entries/client.js"></script>
+  </body>
+</html>
