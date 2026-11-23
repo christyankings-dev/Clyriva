@@ -15,7 +15,7 @@ class IntegrityV25(unittest.TestCase):
         assert_js(self, "function validCpf(value", CORE)
         assert_js(self, "validCpf, validDate", CORE)
         assert_js(self, "if(!validCpf(cleaned)&&!validCnpj(cleaned))", PANEL)
-        assert_js(self, "values.value<0", PANEL)
+        assert_js(self, "if(value<0)return toast('O valor não pode ser negativo.',true)", PANEL)
 
     def test_file_list_is_per_record_and_authorized(self):
         assert_js(self, "internalDocsApi('list',{entityType:type,entityId:recordId})", PANEL)

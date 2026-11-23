@@ -10,7 +10,7 @@ migration=(ROOT/'db/migrations/20261120_v24_internal_documents.sql').read_text()
 link=(ROOT/'db/migrations/20261120_v24_link_publication.sql').read_text()
 class InternalDocsTest(unittest.TestCase):
  def test_file_input_both_forms(self):
-  assert_js(self, "if(type==='tax'||type==='task')",panel)
+  assert_js(self, "(type==='tax'||type==='task')&&(",panel)
   assert_js(self, 'id="f-internal-doc"',panel)
   assert_js(self, "openInternalDocs('tax',record.id,file)",panel)
   assert_js(self, "openInternalDocs('task',record.id,file)",panel)
@@ -23,7 +23,7 @@ class InternalDocsTest(unittest.TestCase):
   for snippet in ["internalDocsApi('start',{entityType:type,entityId:recordId", "start.attachmentId", "internalDocsApi('complete',{attachmentId:start.attachmentId}", "'.from('clyriva-client-attachments')"]:
    assert_js(self, snippet.replace("'.from", ".from"), panel)
  def test_download_requires_server_signature(self):
-  assert_js(self, "internalDocsApi('link',{attachmentId:doc.id",panel)
+  assert_js(self, "internalDocsApi('link',{attachmentId:id,download}",panel)
   self.assertIn(".eq('id',id).eq('admin_id',uid)",edge)
   self.assertIn('createSignedUrl(doc.storage_path,60',edge)
  def test_private_permissions(self):

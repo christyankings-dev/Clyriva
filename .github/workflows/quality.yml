@@ -24,6 +24,7 @@ jobs:
       - name: Install and build the public site
         run: |
           npm ci
+          npm run typecheck
           npm run lint
           npm run format:check
           npm run build
