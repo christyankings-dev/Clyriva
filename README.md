@@ -22,16 +22,9 @@ Em **Meus clientes → Ficha → Cadastrar guia** ou **Criar tarefa**, é possí
 
 A agenda distingue guias sem anexo, envios pendentes, publicações e avisos arquivados. Uma guia publicada pode ainda ter um segundo PDF aguardando liberação. A consulta de documentos pode ser atualizada no painel.
 
-## Código e persistência
+## Código e manutenção
 
-| Componente | Responsabilidade |
-| --- | --- |
-| `index.html`, `app.js`, `admin.html`, `panel.js` | Login da gestão, carteira em memória, validação e gravação com revisão. |
-| `core.js`, `rotina.js` | Datas, valores em centavos, CPF e CNPJ, agenda e resumo mensal. |
-| `servidor.py` | Site e proxy de consulta CNPJ. A consulta usa BrasilAPI e CNPJ.ws. O cadastro aceita preenchimento manual. |
-| `cliente.js`, `avisos-admin.js`, `edge-functions/clyriva-client/` | Sessão do cliente, publicação explícita por empresa, arquivos privados, links curtos e lembretes. |
-| `pwa.js`, `sw.js`, `edge-functions/clyriva-push/` | Instalação dos apps e alertas da gestão. |
-| `db/migrations/` | Evolução do banco. O arquivo `schema_v1_6_reference.sql` é histórico e a instalação de testes o aplica somente a um banco vazio. |
+O painel tem uma página React por área de trabalho. O catálogo de rotas fica em [routes.js](frontend/src/panel/navigation/routes.js). O [guia de arquitetura](docs/ARQUITETURA.md) relaciona cada área aos arquivos de tela, regras, estilos e testes.
 
 O Supabase Auth identifica cada usuário. A lista `clyriva_admins` e as políticas do banco delimitam a carteira do gestor. O aplicativo consulta os vínculos ativos por usuário e empresa a cada leitura. Um segundo administrador tem sua própria carteira. O compartilhamento entre sócios depende de implementação específica.
 
@@ -39,10 +32,19 @@ O cofre usa AES-GCM e senha-mestra. O JSON de backup contém dados legíveis da 
 
 ## Execução e implantação
 
-Para iniciar o servidor, execute `python servidor.py` e abra `http://127.0.0.1:8765`. O login online requer uma conta autorizada no Supabase configurado. O Railway acompanha `main`, com build e comando do Gunicorn em `railway.json`. Para rodar pelo Dockerfile, a imagem já define `CLYRIVA_ENV=production`. O arquivo `config.js` recebe apenas URL e chave pública. Migrações do banco e funções Edge têm implantação separada do site.
+Com Node.js 22.12 ou superior e Python 3.12, execute os comandos abaixo a partir da raiz.
+
+~~~sh
+npm ci
+npm run build
+python -m pip install -r requirements.txt
+python servidor.py
+~~~
+
+Abra [o servidor local](http://127.0.0.1:8765). Para editar a interface com atualização automática, mantenha o servidor Python aberto e execute também npm run dev em outro terminal. O login usa o projeto indicado em frontend/public/config.js. Para desenvolvimento autenticado use um projeto Supabase de teste ou as contas fictícias das suítes. O Dockerfile compila a interface com Node e executa o servidor Python com Gunicorn. O Railway publica a branch main. As migrações e as funções Edge têm implantação própria.
 
 O workflow de qualidade verifica regras da carteira, proxy, lembretes, interface em Chromium e integração com um Supabase descartável. A suíte de integração usa Docker e Supabase CLI. O script `bash tests/run_supabase_local.sh` cria seu próprio projeto local temporário e usa apenas a API do loopback.
 
 Os controles de NF, tributos e pagamentos registram a atividade informada pelo escritório. Emissão fiscal, movimentação bancária e recolhimento de impostos exigem os sistemas próprios.
 
-[Alterações e auditoria da v2.6](CHANGELOG_v2.6.md) · [Histórico da v2.5](CHANGELOG_v2.5.md) · [Guia do aplicativo do cliente](PWA_CLIENTES.md) · [Notificações da gestão](PWA_NOTIFICACOES.md)
+[Alterações e auditoria da v2.6](docs/history/CHANGELOG_v2.6.md) · [Histórico da v2.5](docs/history/CHANGELOG_v2.5.md) · [Guia do aplicativo do cliente](docs/PWA_CLIENTES.md) · [Notificações da gestão](docs/PWA_NOTIFICACOES.md)

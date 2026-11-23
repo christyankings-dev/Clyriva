@@ -1,0 +1,110 @@
+/* Login */
+.login {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #fff;
+}
+.login-hero {
+  background: #102c37;
+  color: white;
+  padding: 65px max(45px, 9vw);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+}
+.login-hero:after {
+  content: '';
+  width: 440px;
+  height: 440px;
+  border: 1px solid #215661;
+  border-radius: 50%;
+  position: absolute;
+  right: -190px;
+  bottom: -150px;
+  box-shadow:
+    0 0 0 85px #103744,
+    0 0 0 180px #12303a;
+  pointer-events: none;
+}
+.login-hero h1 {
+  font-size: clamp(32px, 4vw, 55px);
+  line-height: 1.13;
+  letter-spacing: -2.2px;
+  max-width: 540px;
+}
+.login-hero h1 span {
+  color: #3bd5b6;
+}
+.login-hero p {
+  color: #9dbdc0;
+  font-size: 14px;
+  line-height: 1.85;
+  margin-top: 21px;
+  max-width: 450px;
+}
+.hero-foot {
+  font-size: 11px;
+  color: #94acb2;
+  max-width: 370px;
+  line-height: 1.7;
+}
+.login-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+.login-card {
+  width: 100%;
+  max-width: 450px;
+}
+.login-card h2 {
+  font-size: 29px;
+  letter-spacing: -1.1px;
+  margin-bottom: 9px;
+}
+.login-card > p {
+  font-size: 13px;
+  margin-bottom: 28px;
+}
+.login-card form {
+  display: grid;
+  gap: 16px;
+}
+.login-card .button {
+  min-height: 47px;
+  font-size: 13px;
+}
+.login-card .aside {
+  font-size: 11px;
+  color: #81979e;
+  line-height: 1.7;
+  margin-top: 15px;
+}
+.login-card .auth-msg {
+  margin: 12px 0;
+}
+.demo-box {
+  border: 1px solid #d7e8e3;
+  border-radius: 14px;
+  background: #f3faf8;
+  padding: 17px;
+  margin-top: 28px;
+}
+.demo-box strong {
+  font-size: 12px;
+}
+.demo-box p {
+  font-size: 11px;
+  margin: 6px 0 14px;
+}
+.demo-box .row {
+  gap: 9px;
+}
+.demo-box .button {
+  font-size: 11px;
+  min-height: 37px;
+}

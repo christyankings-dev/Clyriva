@@ -1,17 +1,16 @@
 """Auditoria v2.2: travas regressivas para isolamento, confiabilidade e privacidade."""
+from built_site import assert_js, source_text
 from pathlib import Path
 import re, unittest
 ROOT=Path(__file__).resolve().parents[1]
 EDGE=(ROOT/'edge-functions/clyriva-client/index.ts').read_text()
-CLIENT=(ROOT/'cliente.js').read_text()
-ADMIN=(ROOT/'avisos-admin.js').read_text()
+CLIENT=source_text('client')
+ADMIN=source_text('notices')
 DB=(ROOT/'db/migrations/20261120_v22_reliability.sql').read_text()
 
 class AuditV22(unittest.TestCase):
     def test_no_service_worker_dependency_for_login(self):
-        start=CLIENT.index('async function signIn(')
-        end=CLIENT.index('const supported=',start)
-        login=CLIENT[start:end]
+        login=source_text('client/auth/signIn.js')
         self.assertNotIn('if(!registration)return',login)
         self.assertIn('sb.auth.signInWithPassword',login)
         self.assertIn('clearClientScreen()',login)
@@ -43,12 +42,12 @@ class AuditV22(unittest.TestCase):
             self.assertNotIn('clyriva_push_cron_token',s)
             self.assertNotIn('privateKey',s)
     def test_admin_dashboard_filters(self):
-        self.assertIn("filter==='late'",ADMIN)
-        self.assertIn("filter==='paid'",ADMIN)
-        self.assertIn('billing-summary',ADMIN)
+        assert_js(self, "filter==='late'",ADMIN)
+        assert_js(self, "filter==='paid'",ADMIN)
+        assert_js(self, 'billing-summary',ADMIN)
     def test_private_client_screen_on_logout(self):
-        self.assertIn('clearClientScreen()',CLIENT)
-        self.assertIn("if(event==='SIGNED_OUT')clearClientScreen()",CLIENT)
-        self.assertIn("await api('client-unsubscribe'",CLIENT)
+        assert_js(self, 'clearClientScreen()',CLIENT)
+        assert_js(self, "if(event==='SIGNED_OUT')clearClientScreen()",CLIENT)
+        assert_js(self, "await api('client-unsubscribe'",CLIENT)
 
 if __name__=='__main__':unittest.main()

@@ -9,3 +9,5 @@ tests/
 db/
 *.md
 railway.json
+node_modules/
+dist/

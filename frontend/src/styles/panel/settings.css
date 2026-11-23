@@ -1,0 +1,30 @@
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.settings-block {
+  padding: 24px;
+}
+.settings-block h2 {
+  font-size: 16px;
+  margin: 0 0 9px;
+}
+.settings-block p {
+  font-size: 11px;
+  color: #8599a1;
+  line-height: 1.7;
+  margin-bottom: 17px;
+}
+.settings-block .btn {
+  margin: 0 6px 8px 0;
+}
+.settings-block strong {
+  font-size: 11px;
+}
+.settings-block ul {
+  font-size: 11px;
+  color: #647d86;
+  line-height: 2;
+  padding-left: 17px;
+}

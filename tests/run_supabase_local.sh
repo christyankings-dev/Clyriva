@@ -19,7 +19,7 @@ export ANON_KEY SERVICE_ROLE_KEY
 test "${API_URL%/}" = "http://127.0.0.1:54321"
 export PGOPTIONS="-c clyriva.test_fixture=isolated"
 cd "$repo_dir"
-for sql in schema_v1_6_reference.sql tests/fixtures/private_workspace_v25.sql \
+for sql in db/reference/schema_v1_6_reference.sql tests/fixtures/private_workspace_v25.sql \
   db/migrations/20261120_client_notices.sql db/migrations/20261120_client_billing_reminders.sql \
   db/migrations/20261120_client_push_privacy_default.sql db/migrations/20261120_v22_reliability.sql \
   db/migrations/20261120_v23_private_attachments.sql db/migrations/20261120_v24_internal_documents.sql \

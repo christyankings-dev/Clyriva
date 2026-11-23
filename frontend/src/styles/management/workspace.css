@@ -1,0 +1,183 @@
+.admin-top {
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.admin-top .actions {
+  margin-left: auto;
+}
+.admin-view {
+  width: 100%;
+  min-height: calc(100vh - 82px);
+  height: calc(100vh - 82px);
+  border: 0;
+  display: block;
+}
+.admin-info {
+  padding: 13px 26px;
+  background: #e9f9f2;
+  color: #377561;
+  font-size: 11px;
+  border-bottom: 1px solid #d1eadf;
+}
+.admin-info strong {
+  color: #236752;
+}
+.admin-info.warning {
+  background: #fff7e9;
+  color: #927039;
+  border-color: #f3e8cf;
+}
+.invite-area {
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 30px 38px 60px;
+}
+.invite-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 14px;
+  align-items: end;
+  margin-top: 19px;
+}
+.sm-link {
+  border: 0;
+  background: transparent;
+  color: #0b8a7a;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+.footer-note {
+  margin-top: 18px;
+  font-size: 11px;
+  color: #8ca1a9;
+  line-height: 1.6;
+}
+@media (max-width: 1000px) {
+  .cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .login {
+    grid-template-columns: 1fr;
+  }
+  .login-hero {
+    padding: 35px 30px;
+    min-height: 240px;
+  }
+  .login-hero h1 {
+    font-size: 32px;
+    letter-spacing: -1.2px;
+  }
+  .hero-foot {
+    display: none;
+  }
+  .login-main {
+    padding: 40px 24px;
+  }
+  .side {
+    width: 210px;
+  }
+  .content {
+    padding: 26px 22px;
+  }
+  .header {
+    padding: 18px 22px;
+  }
+  .invite-area {
+    padding: 23px;
+  }
+  .invite-form {
+    grid-template-columns: 1fr 1fr;
+  }
+  .invite-form button {
+    grid-column: 1 / -1;
+  }
+  .layout2 {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 620px) {
+  .shell {
+    display: block;
+  }
+  .side {
+    width: 100%;
+    min-height: auto;
+    padding: 18px 20px;
+    position: relative;
+  }
+  .side h4,
+  .side .brand-sub {
+    display: none;
+  }
+  .side nav {
+    display: flex;
+    gap: 6px;
+    overflow: auto;
+    margin-top: 18px;
+  }
+  .side .nav {
+    white-space: nowrap;
+    padding: 10px 12px;
+  }
+  .side-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 8px;
+  }
+  .header {
+    padding: 14px 19px;
+    min-height: 68px;
+  }
+  .hdr-right {
+    gap: 5px;
+  }
+  .hdr-right small {
+    display: none;
+  }
+  .content {
+    padding: 22px 16px 45px;
+  }
+  .pagehead {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .pagehead h1 {
+    font-size: 25px;
+  }
+  .cards {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .card {
+    padding: 15px;
+  }
+  .card strong {
+    font-size: 19px;
+  }
+  .layout2 {
+    grid-template-columns: 1fr;
+  }
+  .formgrid,
+  .invite-form {
+    grid-template-columns: 1fr;
+  }
+  .invite-form button {
+    grid-column: auto;
+  }
+  .invite-area {
+    padding: 16px;
+  }
+  .admin-view {
+    height: calc(100vh - 170px);
+    min-height: 620px;
+  }
+  .login-hero {
+    min-height: 205px;
+  }
+  .login-hero h1 {
+    font-size: 30px;
+  }
+}

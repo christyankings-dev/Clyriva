@@ -45,6 +45,6 @@ class PwaTest(unittest.TestCase):
         code,body,_,_=servidor.resource('/','127.0.0.1')
         self.assertEqual(code,200)
         self.assertIn(b'manifest.webmanifest',body)
-        self.assertIn(b'pwa.js',body)
+        self.assertRegex(body, rb'<script[^>]+type="module"[^>]+src="/assets/index-[^"/]+\.js"')
 
 if __name__=='__main__':unittest.main()

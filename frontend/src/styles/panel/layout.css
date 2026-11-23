@@ -1,0 +1,52 @@
+#toast-root {
+  position: fixed;
+  right: 18px;
+  bottom: 15px;
+  z-index: 99;
+}
+.toast {
+  padding: 12px 17px;
+  background: #183c43;
+  border-radius: 9px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+  margin-top: 8px;
+  box-shadow: 0 7px 20px #0002;
+  max-width: 350px;
+}
+.toast.bad {
+  background: #ac3c4c;
+}
+.scrim {
+  display: none;
+}
+.caption {
+  color: #94a5ac;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.mt18 {
+  margin-top: 18px;
+}
+.spaced {
+  margin-bottom: 18px;
+}
+.split-title {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+}
+.wrap {
+  flex-wrap: wrap;
+}
+.truncate {
+  min-width: 0;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.nowrap {
+  white-space: nowrap;
+}

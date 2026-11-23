@@ -1,0 +1,17 @@
+@import './base.css';
+@import './navigation.css';
+@import './components.css';
+@import './dashboard.css';
+@import './tables.css';
+@import './filters.css';
+@import './clients.css';
+@import './feedback.css';
+@import './details-and-reports.css';
+@import './forms.css';
+@import './settings.css';
+@import './layout.css';
+@import './responsive.css';
+@import './cnpj.css';
+@import './priority.css';
+@import './vault.css';
+@import './accessibility.css';

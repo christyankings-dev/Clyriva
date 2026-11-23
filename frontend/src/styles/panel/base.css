@@ -1,0 +1,52 @@
+:root {
+  --navy: #102b36;
+  --navy2: #173b46;
+  --ink: #192e38;
+  --soft: #647682;
+  --muted: #8898a0;
+  --teal: #087f75;
+  --teal2: #15aa99;
+  --line: #e5ebed;
+  --bg: #f6f8f8;
+  --panel: #fff;
+  --danger: #bf5260;
+  --amber: #b67d31;
+  --blue: #32749b;
+  --radius: 16px;
+  --shadow: 0 8px 30px rgba(36, 68, 77, 0.035);
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  font-family: Inter, 'Segoe UI', Arial, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  font-size: 13px;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+a {
+  color: var(--teal);
+}
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}

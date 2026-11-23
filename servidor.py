@@ -23,19 +23,25 @@ from functools import lru_cache
 from urllib.error import HTTPError as UrlHTTPError
 
 ROOT = Path(__file__).resolve().parent
+PUBLIC_DIR = ROOT / "dist"
 LOCAL_HTML = 'Clyriva_v1_4_Local_Busca_CNPJ.html'  # caminho preservado para instalações v1.4
-ASSETS = {
-    'index.html': 'text/html', 'admin.html': 'text/html', 'admin-setup.html': 'text/html', LOCAL_HTML: 'text/html',
-    'core.js': 'text/javascript', 'app.js': 'text/javascript', 'file-demo.js': 'text/javascript',
-    'panel.js': 'text/javascript', 'config.js': 'text/javascript', 'vendor/supabase.js': 'text/javascript',
-    'panel.css': 'text/css', 'identity.css': 'text/css', 'rotina.css': 'text/css', 'rotina.js': 'text/javascript',
-    'pwa.css':'text/css', 'pwa.js':'text/javascript', 'sw.js':'text/javascript', 'push-test.js':'text/javascript',
-    'offline.html':'text/html', 'manifest.webmanifest':'application/manifest+json',
-    'cliente.html':'text/html', 'avisos-admin.html':'text/html',
-    'cliente.css':'text/css', 'cliente.js':'text/javascript', 'avisos-admin.js':'text/javascript',
-    'manifest-cliente.webmanifest':'application/manifest+json',
-    'icons/clyriva-192.png':'image/png', 'icons/clyriva-512.png':'image/png',
+PUBLIC_FILES = {
+    "index.html": "text/html", "admin.html": "text/html", "cliente.html": "text/html",
+    "avisos-admin.html": "text/html", "offline.html": "text/html",
+    "config.js": "text/javascript", "vendor/supabase.js": "text/javascript",
+    "sw.js": "text/javascript", "push-test.js": "text/javascript",
+    "manifest.webmanifest": "application/manifest+json",
+    "manifest-cliente.webmanifest": "application/manifest+json",
+    "icons/clyriva-192.png": "image/png", "icons/clyriva-512.png": "image/png",
 }
+
+def asset_type(name):
+    if name in PUBLIC_FILES:
+        return PUBLIC_FILES[name]
+    if re.fullmatch(r"assets/[A-Za-z0-9_.-]+\.(js|css)", name):
+        return "text/javascript" if name.endswith(".js") else "text/css"
+    return None
+
 PROVIDERS = {
     'brasilapi': 'https://brasilapi.com.br/api/cnpj/v1/',
     'cnpjws': 'https://publica.cnpj.ws/cnpj/',
@@ -142,7 +148,7 @@ def security_headers():
 @lru_cache(maxsize=1)
 def supabase_public_config():
     """These are publishable frontend settings, not server-side secrets."""
-    content=(ROOT/'config.js').read_text(encoding='utf-8')
+    content=(PUBLIC_DIR/'config.js').read_text(encoding='utf-8')
     url=re.search(r"supabaseUrl:\s*['\"](https://[a-z0-9-]+\.supabase\.co)['\"]",content)
     key=re.search(r"supabaseAnonKey:\s*['\"](sb_publishable_[A-Za-z0-9_-]+)['\"]",content)
     if not url or not key:
@@ -237,15 +243,16 @@ def resource(path,ip,environ=None):
     asset='index.html' if path=='/' else path[1:]
     if os.getenv('CLYRIVA_ENV') == 'production' and asset in BLOCKED_IN_PRODUCTION:
         return 404,b'Arquivo indisponivel.','text/plain',{}
-    if asset not in ASSETS:
+    mime = asset_type(asset)
+    if not mime:
         return 404,b'Arquivo indisponivel.','text/plain',{}
     try:
-        data=(ROOT/asset).read_bytes()
+        data=(PUBLIC_DIR/asset).read_bytes()
     except OSError:
         return 404,b'Arquivo indisponivel.','text/plain',{}
-    if ASSETS[asset]=='text/html':
+    if mime=='text/html':
         data=data.replace(b'<!-- clyriva-runtime -->',b'<meta name="clyriva-cnpj-proxy" content="/api/cnpj/">',1)
-    return 200,data,ASSETS[asset],{}
+    return 200,data,mime,{}
 
 def application(environ,start_response):
     """Aplicação WSGI para hospedagem HTTPS com servidor de produção."""

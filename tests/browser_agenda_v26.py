@@ -35,7 +35,7 @@ def suite(browser, width):
         if path == "/":
             return r.fulfill(content_type="text/html", body=HOST)
         if path == "/admin.html":
-            html=(ROOT/"admin.html").read_text().replace("<!-- clyriva-runtime -->",'<meta name="clyriva-cnpj-proxy" content="/api/cnpj/">')
+            html=(ROOT/"dist"/"admin.html").read_text()
             return r.fulfill(content_type="text/html",body=html)
         if path.startswith("/api/cnpj/brasilapi/"):
             return r.fulfill(status=429,json={})
@@ -81,7 +81,7 @@ def suite(browser, width):
             return r.fulfill(json=result)
         if path == "/favicon.ico":
             return r.fulfill(status=204)
-        local = ROOT / path.lstrip("/")
+        local = ROOT / "dist" / path.lstrip("/")
         if local.is_file():
             return r.fulfill(content_type=mimetypes.guess_type(str(local))[0] or "text/plain",body=local.read_bytes())
         return r.abort()
@@ -143,6 +143,25 @@ def suite(browser, width):
     frame.locator("#lookup-cnpj").click()
     expect(frame.locator("#lookup-cnpj")).to_be_enabled()
     expect(frame.locator("#f-name")).to_have_value("Razão social conferida")
+    frame.locator("[data-action='close-modal']").first.click()
+    for route, title in [
+        ("clients","Meus clientes"), ("invoices","Notas fiscais"), ("cash","Financeiro dos clientes"),
+        ("fees","Meus honorários"), ("taxes","Guias e tributos"), ("tasks","Obrigações e pendências"),
+        ("service","Atendimentos"), ("vault","Cofre de acessos"), ("reports","Relatórios por cliente"),
+        ("settings","Dados e backup"), ("dashboard","Sua gestão, em perspectiva"),
+    ]:
+        if width < 920:
+            frame.locator("#hamb").click()
+        frame.locator(f"[data-page='{route}']").click()
+        expect(frame.locator("#page h1")).to_have_text(title)
+        if route == "clients":
+            frame.locator("#search").press_sequentially("Aurora")
+            expect(frame.locator(".client-card")).to_have_count(1)
+            expect(frame.locator("#search")).to_be_focused()
+            expect(frame.locator(".client-card h3")).to_have_text("Aurora")
+        if route == "reports":
+            expect(frame.locator("#page tbody")).to_contain_text("Aurora")
+        assert "[object Object]" not in frame.locator("#page").inner_text(), route
     assert not errors,errors
     ctx.close()
     print(f"OK: agenda, fuso, ficha, anexo privado, retentativa, publicação e falha de consulta ({width}px)")

@@ -1,6 +1,7 @@
 """Testes de interface da versao 2.1 com dados ficticios e backend inteiramente simulado."""
 import threading,sys
 from pathlib import Path
+from built_site import open_fixture
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
@@ -47,10 +48,7 @@ def run_suite():
    for label,width,height in [('desktop',1440,900),('mobile',390,844)]:
     ctx=browser.new_context(viewport={'width':width,'height':height});page=ctx.new_page();errs=[]
     page.on('pageerror',lambda e:errs.append(str(e)))
-    page.set_content((ROOT/'avisos-admin.html').read_text())
-    page.add_style_tag(content=(ROOT/'cliente.css').read_text())
-    page.add_script_tag(content=FAKE)
-    page.add_script_tag(content=(ROOT/'avisos-admin.js').read_text())
+    open_fixture(page, 'avisos-admin.html', FAKE)
     page.wait_for_selector('#admin-workspace:not(.hidden)',timeout=8000)
     check(label+' administração abre',True)
     check(label+' form de cobrança',page.locator('#charge-form').is_visible())
@@ -84,9 +82,7 @@ def run_suite():
     check(label+' sem JS errors',not errs)
     page.close();page=ctx.new_page();errs=[]
     page.on('pageerror',lambda e:errs.append(str(e)))
-    page.set_content((ROOT/'cliente.html').read_text())
-    page.add_script_tag(content=FAKE)
-    page.add_script_tag(content=(ROOT/'cliente.js').read_text())
+    open_fixture(page, 'cliente.html', FAKE)
     page.wait_for_selector('#client-area:not(.hidden)',timeout=6000)
     check(label+' área cliente abre',page.locator('#client-area').is_visible())
     page.locator('#client-notice-filter').select_option('all')

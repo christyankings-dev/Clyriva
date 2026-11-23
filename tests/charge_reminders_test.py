@@ -1,4 +1,5 @@
 import unittest
+from built_site import assert_js, source_text
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 import sys
@@ -15,19 +16,18 @@ class ChargeRemindersTests(unittest.TestCase):
         self.assertIn(b'name="dueDate"',data)
         self.assertIn(b'charge-cancel-edit',data)
     def test_admin_flows(self):
-        js=(ROOT/'avisos-admin.js').read_text()
-        self.assertIn("api(isEdit?'update-charge':'create-charge'",js)
-        self.assertIn("api('mark-paid'",js)
-        self.assertIn("api('reopen-charge'",js)
-        self.assertIn("api('archive'",js)
+        js=source_text('notices')
+        assert_js(self, "api(isEdit?'update-charge':'create-charge'",js)
+        assert_js(self, "api('mark-paid'",js)
+        assert_js(self, "api('reopen-charge'",js)
+        assert_js(self, "api('archive'",js)
     def test_client_opt_in_and_amount(self):
         status,data,*_=servidor.resource('/cliente.html','127.0.0.1')
         self.assertEqual(status,200)
         self.assertIn(b'id="client-show-amount"',data)
-        self.assertIn(b'my',b'my')
-        js=(ROOT/'cliente.js').read_text()
-        self.assertIn('showAmount',js)
-        self.assertIn('n.amount_cents',js)
+        js=source_text('client')
+        assert_js(self, 'showAmount',js)
+        assert_js(self, 'notice.amount_cents',js)
     def test_migration_no_public_push_subscriptions(self):
         sql=(ROOT/'db/migrations/20261120_client_billing_reminders.sql').read_text()
         self.assertIn('delivery_date date not null',sql)

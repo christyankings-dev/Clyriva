@@ -1,0 +1,93 @@
+/* Painel só é exibido após validação da sessão pelo aplicativo principal. */
+body[data-mode='online']:not(.clyriva-initialized) .shell {
+  display: none;
+}
+[aria-busy='true'] {
+  cursor: progress;
+}
+#panel-status {
+  margin: 1rem auto;
+  max-width: 60rem;
+  line-height: 1.6;
+  padding: 1rem;
+  background: #fff3df;
+  color: #65441b;
+}
+#panel-status[hidden] {
+  display: none;
+}
+.shell[hidden] {
+  display: none !important;
+}
+/* Refinamento visual e acessibilidade — reconstrução a partir do pacote v1.6. */
+:root {
+  --bg: #f5f9f8;
+  --line: #dfe9e9;
+  --shadow: 0 12px 36px rgba(20, 61, 67, 0.05);
+}
+.side {
+  background: linear-gradient(175deg, #103440 0%, #0e2733 100%);
+}
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 11;
+  box-shadow: 0 2px 14px rgba(16, 57, 63, 0.025);
+}
+.page-head h1 {
+  line-height: 1.17;
+}
+.kpi {
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.kpi:hover {
+  border-color: #c9dfdb;
+  box-shadow: 0 15px 35px rgba(20, 61, 67, 0.065);
+}
+.btn:focus-visible,
+.nav:focus-visible,
+.hamb:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #0aa18f;
+  outline-offset: 3px;
+}
+.table td {
+  font-size: 12px;
+  line-height: 1.55;
+}
+.table th {
+  color: #617d85;
+}
+.panel-head p,
+.kpi-foot {
+  font-size: 11px;
+}
+.priority-pill {
+  line-height: 1.25;
+}
+@media (max-width: 620px) {
+  .topbar {
+    position: relative;
+  }
+  .kpi {
+    padding: 16px;
+  }
+  .kpi-value {
+    font-size: 21px;
+  }
+  .table td {
+    font-size: 12px;
+  }
+  .page-head h1 {
+    font-size: 27px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kpi {
+    transition: none;
+  }
+}

@@ -1,5 +1,6 @@
 """Cenarios de auditoria para filtros, privacidade e credenciais sem servidor real."""
 from pathlib import Path
+from built_site import open_fixture
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 FAKE='''
@@ -26,10 +27,7 @@ with sync_playwright() as pw:
  for label,width in [('desktop',1366),('mobile',390)]:
   context=browser.new_context(viewport={'width':width,'height':850});page=context.new_page();errors=[]
   page.on('pageerror',lambda e: errors.append(str(e)))
-  page.set_content((ROOT/'avisos-admin.html').read_text())
-  page.add_style_tag(content=(ROOT/'cliente.css').read_text())
-  page.add_script_tag(content=FAKE)
-  page.add_script_tag(content=(ROOT/'avisos-admin.js').read_text())
+  open_fixture(page, 'avisos-admin.html', FAKE)
   page.locator('#admin-workspace:not(.hidden)').wait_for(timeout=8000)
   assert page.locator('#billing-summary .summary-item').count()==4,label+' summary'
   assert page.locator('#notices-list .notice-card').count()==2,label+' all records'
@@ -45,7 +43,7 @@ with sync_playwright() as pw:
   assert not errors,(label,errors)
   print('PASS',label,'admin metrics, paid/pending filters, admin reset and secret hidden')
   page.close();page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
-  page.set_content((ROOT/'cliente.html').read_text());page.add_script_tag(content=FAKE);page.add_script_tag(content=(ROOT/'cliente.js').read_text())
+  open_fixture(page, 'cliente.html', FAKE)
   page.locator('#client-area:not(.hidden)').wait_for(timeout=8000)
   assert page.locator('#client-billing-overview .summary-item').count()==4,label+' client summary'
   assert not page.locator('#client-show-amount').is_checked(),label+' optin by default'

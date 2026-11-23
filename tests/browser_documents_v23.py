@@ -1,5 +1,6 @@
 """Browser integration with simulated Supabase; no real customer data touched."""
 from pathlib import Path
+from built_site import open_fixture
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 FAKE = '''
@@ -28,7 +29,7 @@ with sync_playwright() as pw:
  browser=pw.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--disable-dev-shm-usage'])
  for size in [390,1366]:
   ctx=browser.new_context(viewport={'width':size,'height':800});page=ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
-  page.set_content((ROOT/'avisos-admin.html').read_text());page.add_script_tag(content=FAKE);page.add_script_tag(content=(ROOT/'avisos-admin.js').read_text())
+  open_fixture(page, 'avisos-admin.html', FAKE)
   page.locator('#admin-workspace:not(.hidden)').wait_for(timeout=8000)
   assert page.locator('#charge-attachment').count()==1
   assert page.get_by_text('das-ficticio.pdf').count()>=1
@@ -44,7 +45,7 @@ with sync_playwright() as pw:
   assert not errors,errors
   print('PASS ADMIN',size,'existing attachment visible, upload/preview/download controls')
   page.close();page=ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
-  page.set_content((ROOT/'cliente.html').read_text());page.add_script_tag(content=FAKE);page.add_script_tag(content=(ROOT/'cliente.js').read_text())
+  open_fixture(page, 'cliente.html', FAKE)
   page.locator('#client-area:not(.hidden)').wait_for(timeout=8000)
   assert page.get_by_text('das-ficticio.pdf').count()>=1
   assert page.get_by_role('button',name='Visualizar').count()==1

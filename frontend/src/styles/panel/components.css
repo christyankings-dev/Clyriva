@@ -1,0 +1,243 @@
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 26px;
+}
+.eyebrow {
+  color: var(--teal);
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  font-weight: 850;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.page-head h1 {
+  font-size: 30px;
+  font-weight: 820;
+  letter-spacing: -1.15px;
+  margin: 0 0 8px;
+}
+.page-head p {
+  color: #7b8e98;
+  font-size: 12px;
+  line-height: 1.65;
+  margin: 0;
+}
+.actions {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px 15px;
+  font-size: 11px;
+  font-weight: 780;
+  background: #fff;
+  color: #34515d;
+  min-height: 39px;
+  white-space: nowrap;
+}
+.btn:hover {
+  border-color: #a7d0cd;
+  background: #f6fdfc;
+}
+.btn.primary {
+  background: #087e76;
+  color: #fff;
+  border-color: #087e76;
+  box-shadow: 0 3px 8px #087e7620;
+}
+.btn.primary:hover {
+  background: #056c65;
+}
+.btn.ghost {
+  background: #f6f9f9;
+  border-color: #e4ecee;
+}
+.btn.danger {
+  color: #b84050;
+  border-color: #f1dfe2;
+  background: #fff9fa;
+}
+.btn.small {
+  padding: 7px 9px;
+  font-size: 10px;
+  min-height: 28px;
+}
+.btn.plain {
+  padding: 7px 4px;
+  background: none;
+  border: 0;
+  color: var(--teal);
+  box-shadow: none;
+}
+.btn.inline {
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: var(--teal);
+  font-size: 11px;
+  min-height: 0;
+}
+.btn.full {
+  width: 100%;
+}
+.mini-badge {
+  font-size: 9px;
+  padding: 5px 9px;
+  border-radius: 50px;
+  font-weight: 800;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #edf2f3;
+  color: #697982;
+}
+.mini-badge.good {
+  background: #e4f5ee;
+  color: #0b835c;
+}
+.mini-badge.bad {
+  background: #fbeaec;
+  color: #bc4559;
+}
+.mini-badge.warn {
+  background: #fff1de;
+  color: #a8782c;
+}
+.mini-badge.info {
+  background: #e6f0fa;
+  color: #3b7496;
+}
+.mini-badge.muted {
+  background: #eff3f5;
+  color: #71838d;
+}
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+.kpi {
+  background: #fff;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  padding: 20px 22px 19px;
+  border-radius: var(--radius);
+  min-width: 0;
+}
+.kpi-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 9px;
+  align-items: center;
+}
+.kpi-title {
+  font-size: 11px;
+  color: #768a95;
+  font-weight: 710;
+  line-height: 1.4;
+}
+.kpi-icon {
+  height: 32px;
+  width: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: #e7f5f2;
+  color: #148c7f;
+  font-size: 17px;
+}
+.kpi:nth-child(2) .kpi-icon {
+  background: #edf3fe;
+  color: #4c82b6;
+}
+.kpi:nth-child(3) .kpi-icon {
+  background: #fff5e8;
+  color: #b68642;
+}
+.kpi:nth-child(4) .kpi-icon {
+  background: #f5edfa;
+  color: #9873ac;
+}
+.kpi-value {
+  font-size: 26px;
+  letter-spacing: -0.9px;
+  margin: 14px 0 6px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kpi-foot {
+  font-size: 10px;
+  color: #94a3ac;
+  line-height: 1.4;
+}
+.grid-main {
+  display: grid;
+  grid-template-columns: 1.65fr 1fr;
+  gap: 17px;
+  margin-bottom: 18px;
+}
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+.panel-pad {
+  padding: 22px;
+}
+.panel-head {
+  padding: 21px 23px 15px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.panel-head h2 {
+  font-size: 15px;
+  letter-spacing: -0.2px;
+  margin: 0 0 5px;
+}
+.panel-head p {
+  color: #94a4ac;
+  font-size: 10px;
+  margin: 0;
+}
+.panel-body {
+  padding: 4px 23px 23px;
+}
+.subtitle {
+  font-size: 11px;
+  color: #78909c;
+  margin: 0;
+}
+.section {
+  margin-bottom: 19px;
+}
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+}
+.section-header h2 {
+  font-size: 16px;
+  margin: 0;
+}
