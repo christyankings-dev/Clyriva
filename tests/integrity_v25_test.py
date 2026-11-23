@@ -4,18 +4,18 @@ from built_site import assert_js, source_text
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PANEL = source_text('panel')
-CORE = source_text('domain/workspace.js')
+PANEL = source_text('apps/panel')
+CORE = source_text('shared/domain/workspace')
 EDGE = (ROOT / "edge-functions/clyriva-client/index.ts").read_text()
-ADMIN = source_text('notices')
+ADMIN = source_text('apps/notices')
 
 
 class IntegrityV25(unittest.TestCase):
     def test_cpf_verifier_and_panel(self):
-        assert_js(self, "function validCpf(value)", CORE)
+        assert_js(self, "function validCpf(value", CORE)
         assert_js(self, "validCpf, validDate", CORE)
         assert_js(self, "if(!validCpf(cleaned)&&!validCnpj(cleaned))", PANEL)
-        assert_js(self, "values.value<0", PANEL)
+        assert_js(self, "if(value<0)return toast('O valor não pode ser negativo.',true)", PANEL)
 
     def test_file_list_is_per_record_and_authorized(self):
         assert_js(self, "internalDocsApi('list',{entityType:type,entityId:recordId})", PANEL)
@@ -29,8 +29,8 @@ class IntegrityV25(unittest.TestCase):
             section = EDGE.split(marker, 1)[1].split("\n  }", 1)[0]
             self.assertIn(".is('source_type',null)", section, marker)
         assert_js(self, "linked=Boolean(n.source_type&&n.source_id)", ADMIN)
-        assert_js(self, "if(bill&&n.status==='paid'&&!linked)", ADMIN)
-        assert_js(self, "if(!linked){", ADMIN)
+        assert_js(self, "bill&&n.status==='paid'&&!linked", ADMIN)
+        assert_js(self, "{!linked&&(", ADMIN)
 
     def test_manual_archival_is_preserved(self):
         self.assertIn("if(action==='internal-sync'&&found?.status==='archived')", EDGE)

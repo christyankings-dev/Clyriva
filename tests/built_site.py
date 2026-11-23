@@ -9,10 +9,19 @@ SOURCE = ROOT / "frontend" / "src"
 sys.path.insert(0, str(ROOT))
 
 
+CODE_SUFFIXES = {".js", ".jsx", ".ts", ".tsx"}
+
+
 def source_text(area):
+    """Texto de código de uma pasta ou arquivo de frontend/src (arquivo: informe sem extensão)."""
     directory = SOURCE / area
-    paths = sorted(directory.rglob("*")) if directory.is_dir() else [directory]
-    return "\n".join(p.read_text() for p in paths if p.suffix in {".js", ".jsx"})
+    if directory.is_dir():
+        paths = sorted(directory.rglob("*"))
+    else:
+        paths = [p for p in (SOURCE / (area + s) for s in sorted(CODE_SUFFIXES)) if p.is_file()]
+        if not paths:
+            raise FileNotFoundError(area)
+    return "\n".join(p.read_text() for p in paths if p.suffix in CODE_SUFFIXES)
 
 
 def assert_js(test, fragment, source):

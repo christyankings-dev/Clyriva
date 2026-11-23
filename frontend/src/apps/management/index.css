@@ -1,0 +1,5 @@
+@import './styles/index.css';
+@import '../../shared/agenda/agenda.css';
+@import '../../shared/styles/theme.css';
+@import './styles/identity.css';
+@import './styles/pwa.css';
