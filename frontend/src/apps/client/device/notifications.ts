@@ -1,6 +1,6 @@
-import { clientDevice, pushReceipt } from './state.js';
-import { lockDevice, renderDevice } from './feedback.js';
-import { status } from '../view.js';
+import { clientDevice, pushReceipt } from './state.ts';
+import { lockDevice, renderDevice } from './feedback.ts';
+import { status } from '../view.ts';
 import {
   currentDevice,
   decodeBase64,
@@ -8,11 +8,14 @@ import {
   ready,
   refreshPushPreference,
   unmetRequirement,
-} from './registration.js';
-import { $, api, config, sb } from '../api.js';
-import { showTest } from './testReceipt.js';
+} from './registration.ts';
+import { must } from '../../../shared/lib/dom.ts';
+import { errorInfo } from '../../../shared/lib/errors.ts';
+import { api, config, sb } from '../api.ts';
+import { showTest } from './testReceipt.ts';
+import type { PushTestRow } from '../../../shared/types/bridges.ts';
 
-async function enable() {
+async function enable(): Promise<void> {
   if (clientDevice.pushBusy) return;
   const version = clientDevice.screenVersion;
   clientDevice.deviceVersion++;
@@ -44,8 +47,8 @@ async function enable() {
       });
     };
     if (!sub) sub = await subscribe();
-    const showAmount = $('#client-show-amount').checked;
-    const save = (sub) =>
+    const showAmount = must<HTMLInputElement>('#client-show-amount').checked;
+    const save = (sub: PushSubscription) =>
       api('client-subscribe', {
         subscription: sub.toJSON(),
         showAmount,
@@ -54,7 +57,7 @@ async function enable() {
     try {
       await save(sub);
     } catch (error) {
-      if (error.status !== 409 || device.preference.enabled) throw error;
+      if (errorInfo(error).status !== 409 || device.preference.enabled) throw error;
       // Uma assinatura exclusiva de cliente pode ter sobrado de outra sessão neste navegador.
       if (!(await sub.unsubscribe())) throw error;
       sub = await subscribe();
@@ -73,23 +76,23 @@ async function enable() {
     }
   } catch (e) {
     if (version === clientDevice.screenVersion)
-      status('#push-feedback', e.message || 'Falha na ativação.', true);
+      status('#push-feedback', errorInfo(e).message || 'Falha na ativação.', true);
   } finally {
     if (version === clientDevice.screenVersion) lockDevice(false);
   }
 }
 
-async function test() {
+async function test(): Promise<void> {
   if (clientDevice.pushBusy) return;
   const version = clientDevice.screenVersion;
-  let testId = null;
+  let testId: string | null = null;
   lockDevice(true);
   status('#push-feedback', '');
   try {
     const problem = unmetRequirement();
     if (problem || Notification.permission !== 'granted') {
       renderDevice(false, problem || 'Autorize as notificações para fazer o teste.');
-      throw Error($('#device-status').textContent);
+      throw Error(must('#device-status').textContent ?? '');
     }
     const { sub, preference } = await currentDevice(await ready());
     if (!sub || !preference.enabled) {
@@ -103,7 +106,7 @@ async function test() {
     if (pushReceipt.latestTest && Date.now() - pushReceipt.latestTest.started < 30000)
       throw Error('Aguarde 30 segundos entre os testes.');
     testId = crypto.randomUUID();
-    const row = {
+    const row: PushTestRow = {
       id: testId,
       owner: session?.user?.id || null,
       started: Date.now(),
@@ -112,7 +115,7 @@ async function test() {
     showTest(row);
     if (row.owner) await ClyrivaPushTest.start(row).catch(() => {});
     if (version !== clientDevice.screenVersion) return;
-    const reply = await api('client-test', {
+    const reply = await api<{ testId?: string }>('client-test', {
       endpoint: sub.endpoint,
       testId,
     });
@@ -133,26 +136,27 @@ async function test() {
       );
     }
   } catch (e) {
+    const failure = errorInfo(e);
     if (version !== clientDevice.screenVersion) return;
     // Uma resposta perdida pode chegar depois do push. Preservar uma confirmação local nesse caso.
     if (pushReceipt.latestTest?.id === testId && pushReceipt.latestTest.state === 'shown') return;
-    if (testId && e.status && e.status < 500) {
+    if (testId && failure.status && failure.status < 500) {
       await ClyrivaPushTest.forget(testId).catch(() => {});
       if (version !== clientDevice.screenVersion) return;
       if (pushReceipt.latestTest?.id === testId) showTest(null);
     }
-    status('#push-feedback', e.message || 'Falha ao enviar o teste.', true);
-    if (e.status === 404 || e.status === 502) refreshPushPreference();
+    status('#push-feedback', failure.message || 'Falha ao enviar o teste.', true);
+    if (failure.status === 404 || failure.status === 502) refreshPushPreference();
   } finally {
     if (version === clientDevice.screenVersion) lockDevice(false);
   }
 }
 
-async function disconnectDevice() {
+async function disconnectDevice(): Promise<string> {
   // A inscrição da gestão pode ocupar o escopo raiz. Só remover ali a inscrição confirmada para o cliente.
   const active = await ready(),
     dedicated = await active.pushManager.getSubscription();
-  let legacy = null,
+  let legacy: PushSubscription | null | undefined = null,
     warning = '';
   try {
     legacy = (await legacyDevice())?.sub;
@@ -161,7 +165,11 @@ async function disconnectDevice() {
     warning =
       'Não foi possível conferir uma inscrição antiga. Verifique as permissões do aparelho.';
   }
-  const all = new Map([dedicated, legacy].filter(Boolean).map((sub) => [sub.endpoint, sub]));
+  const all = new Map(
+    [dedicated, legacy]
+      .filter((sub): sub is PushSubscription => Boolean(sub))
+      .map((sub) => [sub.endpoint, sub] as const),
+  );
   for (const sub of all.values()) {
     try {
       await api('client-unsubscribe', {
@@ -180,7 +188,7 @@ async function disconnectDevice() {
   return warning;
 }
 
-async function disable() {
+async function disable(): Promise<void> {
   if (clientDevice.pushBusy) return;
   const version = clientDevice.screenVersion;
   clientDevice.deviceVersion++;
@@ -193,7 +201,8 @@ async function disable() {
     status('#push-feedback', warning || 'Você pode ativá-las novamente quando quiser.', !!warning);
     if (warning) refreshPushPreference();
   } catch (e) {
-    if (version === clientDevice.screenVersion) status('#push-feedback', e.message, true);
+    if (version === clientDevice.screenVersion)
+      status('#push-feedback', errorInfo(e).message, true);
   } finally {
     if (version === clientDevice.screenVersion) lockDevice(false);
   }

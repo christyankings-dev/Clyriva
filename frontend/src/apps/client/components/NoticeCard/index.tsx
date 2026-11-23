@@ -1,40 +1,20 @@
-import { daysRemaining, money } from './format.js';
-import { safeDate } from '../view.js';
-import { openDocument } from './openDocument.js';
+import { daysRemaining, money } from '../../billing/format.ts';
+import { safeDate } from '../../view.ts';
+import type { Notice } from '../../types.ts';
+import { AttachedDocuments } from './components/AttachedDocuments/index.tsx';
 import styles from './NoticeCard.module.css';
+import type { NoticeCardProps } from './types.ts';
 
-function dueLabel(notice) {
+function dueLabel(notice: Notice): string {
   if (notice.status === 'paid') return 'Pago';
   if (!notice.due_date) return 'Comunicado';
-  const days = daysRemaining(notice.due_date);
+  const days = daysRemaining(notice.due_date) ?? 0;
   if (days === 0) return 'Vence hoje';
   if (days === 1) return 'Vence amanhã';
   return days > 1 ? 'Faltam ' + days + ' dias' : 'Prazo vencido';
 }
 
-function AttachedDocuments({ attachments }) {
-  if (!attachments.length) return null;
-  return (
-    <div className="document-list">
-      <strong className="document-title">
-        {attachments.length === 1 ? 'Guia ou documento anexo' : 'Documentos anexados'}
-      </strong>
-      {attachments.map((file) => (
-        <div key={file.id} className="document-row">
-          <span className="document-name">📎 {file.original_name}</span>
-          <button type="button" className="btn" onClick={() => openDocument(file.id)}>
-            Visualizar
-          </button>
-          <button type="button" className="btn" onClick={() => openDocument(file.id, true)}>
-            Baixar
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-export function NoticeCard({ notice, company, attachments }) {
+export function NoticeCard({ notice, company, attachments }: NoticeCardProps) {
   return (
     <article className="notice-card">
       <div className={styles.heading}>

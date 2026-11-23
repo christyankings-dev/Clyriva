@@ -1,16 +1,16 @@
-import { ios, standalone } from './platform.js';
-import { clientActivity } from './state.js';
+import { ios, standalone } from './platform.ts';
+import { clientActivity } from './state.ts';
 
-function installFeedback(message) {
+function installFeedback(message: string): void {
   for (const el of document.querySelectorAll('[data-install-feedback]')) el.textContent = message;
 }
 
-function updateInstall() {
+function updateInstall(): void {
   for (const el of document.querySelectorAll('[data-install-area]'))
     el.classList.toggle('hidden', standalone());
 }
 
-async function install() {
+async function install(): Promise<void> {
   if (standalone()) {
     updateInstall();
     return;

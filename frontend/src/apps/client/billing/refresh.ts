@@ -1,30 +1,40 @@
-import { clientActivity, clientDevice } from '../device/state.js';
-import { $, api } from '../api.js';
-import { daysRemaining } from './format.js';
-import { showBilling } from './BillingOverview.jsx';
-import { status, view } from '../view.js';
-import { refreshPushPreference } from '../device/registration.js';
-import { recoverTest } from '../device/testReceipt.js';
+import { clientActivity, clientDevice } from '../device/state.ts';
+import { api } from '../api.ts';
+import { $ } from '../../../shared/lib/dom.ts';
+import { daysRemaining } from './format.ts';
+import { showBilling } from '../components/BillingOverview/index.tsx';
+import { status, view } from '../view.ts';
+import { refreshPushPreference } from '../device/registration.ts';
+import { recoverTest } from '../device/testReceipt.ts';
+import type { ClientList, Notice } from '../types.ts';
 
-async function refresh() {
+/** Dias até o vencimento; sem data conta como 0, como no comportamento original. */
+function daysLeft(notice: Notice): number {
+  return daysRemaining(notice.due_date) ?? 0;
+}
+
+async function refresh(): Promise<void> {
   const version = clientDevice.screenVersion;
-  const data = await api('client-list');
+  const data = await api<ClientList>('client-list');
   if (version !== clientDevice.screenVersion) return;
   const byClient = new Map(
-    (data.companies || []).map((c) => [c.admin_id + '|' + c.client_id, c.company]),
+    (data.companies || []).map((c): [string, string] => [
+      c.admin_id + '|' + c.client_id,
+      c.company,
+    ]),
   );
   const notices = Array.isArray(data.notices) ? data.notices : [];
-  const filter = $('#client-notice-filter')?.value || 'pending';
+  const filter = $<HTMLSelectElement>('#client-notice-filter')?.value || 'pending';
   const localItems = notices.filter(
     (n) => filter === 'all' || (filter === 'paid' ? n.status === 'paid' : n.status !== 'paid'),
   );
-  const rank = (n) =>
+  const rank = (n: Notice): number =>
     n.status === 'paid'
       ? 3
       : n.reminder_enabled && n.due_date
-        ? daysRemaining(n.due_date) < 0
+        ? daysLeft(n) < 0
           ? 0
-          : daysRemaining(n.due_date) <= 3
+          : daysLeft(n) <= 3
             ? 1
             : 2
         : 2;
@@ -35,9 +45,9 @@ async function refresh() {
       String(b.created_at || '').localeCompare(String(a.created_at || '')),
   );
   const pending = notices.filter((n) => n.reminder_enabled && n.status === 'active');
-  const overdue = pending.filter((n) => daysRemaining(n.due_date) < 0);
+  const overdue = pending.filter((n) => daysLeft(n) < 0);
   const next3 = pending.filter((n) => {
-    const days = daysRemaining(n.due_date);
+    const days = daysLeft(n);
     return days >= 0 && days <= 3;
   });
   showBilling({

@@ -1,9 +1,11 @@
-import { ios, standalone } from './platform.js';
-import { $, api } from '../api.js';
-import { CLIENT_SCOPE, clientActivity, clientDevice } from './state.js';
-import { renderDevice } from './feedback.js';
+import { ios, standalone } from './platform.ts';
+import { must } from '../../../shared/lib/dom.ts';
+import { api } from '../api.ts';
+import type { DeviceInfo, PushPreference } from '../types.ts';
+import { CLIENT_SCOPE, clientActivity, clientDevice } from './state.ts';
+import { renderDevice } from './feedback.ts';
 
-function unmetRequirement() {
+function unmetRequirement(): string {
   if (ios && !standalone())
     return 'No iPhone ou iPad, adicione o aplicativo à Tela de Início pelo Safari e abra-o pelo ícone para ativar os alertas.';
   if (ios && (!('Notification' in window) || !('PushManager' in window)))
@@ -15,12 +17,12 @@ function unmetRequirement() {
   return '';
 }
 
-async function legacyDevice() {
+async function legacyDevice(): Promise<DeviceInfo | null> {
   const worker = await navigator.serviceWorker.getRegistration?.('/');
   if (!worker || worker.scope !== new URL('/', location.href).href) return null;
   const sub = await worker.pushManager?.getSubscription();
   if (!sub) return null;
-  const preference = await api('client-push-status', {
+  const preference = await api<PushPreference>('client-push-status', {
     endpoint: sub.endpoint,
   });
   return preference.enabled
@@ -31,10 +33,10 @@ async function legacyDevice() {
     : null;
 }
 
-async function currentDevice(worker) {
+async function currentDevice(worker: ServiceWorkerRegistration): Promise<DeviceInfo> {
   const sub = await worker.pushManager.getSubscription();
   if (sub) {
-    const preference = await api('client-push-status', {
+    const preference = await api<PushPreference>('client-push-status', {
       endpoint: sub.endpoint,
     });
     if (preference.enabled)
@@ -54,7 +56,7 @@ async function currentDevice(worker) {
   );
 }
 
-async function refreshPushPreference() {
+async function refreshPushPreference(): Promise<void> {
   const version = ++clientDevice.deviceVersion;
   const problem = unmetRequirement();
   if (problem) {
@@ -65,7 +67,7 @@ async function refreshPushPreference() {
     const device = await currentDevice(await ready());
     if (version !== clientDevice.deviceVersion || !clientActivity.loaded) return;
     clientDevice.lastDevice = device.preference.enabled ? device.sub : null;
-    $('#client-show-amount').checked = device.preference.showAmount === true;
+    must<HTMLInputElement>('#client-show-amount').checked = device.preference.showAmount === true;
     const enabled = device.preference.enabled && Notification.permission === 'granted';
     renderDevice(
       enabled,
@@ -82,12 +84,13 @@ async function refreshPushPreference() {
   }
 }
 
-const supported = () => window.isSecureContext && 'serviceWorker' in navigator;
+const supported = (): boolean => window.isSecureContext && 'serviceWorker' in navigator;
 
-function ready() {
+function ready(): Promise<ServiceWorkerRegistration> {
   if (!supported()) return Promise.reject(Error('Este navegador não suporta notificações.'));
-  if (!clientActivity.registrationPromise) {
-    clientActivity.registrationPromise = navigator.serviceWorker
+  let pending = clientActivity.registrationPromise;
+  if (!pending) {
+    pending = navigator.serviceWorker
       .register('/sw.js', {
         scope: CLIENT_SCOPE,
       })
@@ -95,19 +98,20 @@ function ready() {
         if (registration.active?.state === 'activated') return registration;
         const worker = registration.installing || registration.waiting || registration.active;
         if (!worker) throw Error('Não foi possível preparar as notificações. Tente novamente.');
-        return new Promise((resolve, reject) => {
-          function finish(ok) {
+        const target: ServiceWorker = worker;
+        return new Promise<ServiceWorkerRegistration>((resolve, reject) => {
+          function finish(ok: boolean): void {
             clearTimeout(timer);
-            worker.removeEventListener('statechange', changed);
+            target.removeEventListener('statechange', changed);
             if (ok) resolve(registration);
             else reject(Error('Não foi possível preparar as notificações. Tente novamente.'));
           }
-          function changed() {
-            if (worker.state === 'activated') finish(true);
-            else if (worker.state === 'redundant') finish(false);
+          function changed(): void {
+            if (target.state === 'activated') finish(true);
+            else if (target.state === 'redundant') finish(false);
           }
           const timer = setTimeout(() => finish(false), 10000);
-          worker.addEventListener('statechange', changed);
+          target.addEventListener('statechange', changed);
           changed();
         });
       })
@@ -115,11 +119,12 @@ function ready() {
         clientActivity.registrationPromise = null;
         throw error;
       });
+    clientActivity.registrationPromise = pending;
   }
-  return clientActivity.registrationPromise;
+  return pending;
 }
 
-function decodeBase64(str) {
+function decodeBase64(str: string): Uint8Array<ArrayBuffer> {
   const txt = atob(
     (str + '='.repeat((4 - (str.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/'),
   );

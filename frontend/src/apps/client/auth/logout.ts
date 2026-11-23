@@ -1,12 +1,12 @@
-import { clientDevice } from '../device/state.js';
-import { lockDevice } from '../device/feedback.js';
-import { supported } from '../device/registration.js';
-import { disconnectDevice } from '../device/notifications.js';
-import { sb } from '../api.js';
-import { clearClientScreen } from './clear.js';
-import { status } from '../view.js';
+import { clientDevice } from '../device/state.ts';
+import { lockDevice } from '../device/feedback.ts';
+import { supported } from '../device/registration.ts';
+import { disconnectDevice } from '../device/notifications.ts';
+import { sb } from '../api.ts';
+import { clearClientScreen } from './clear.ts';
+import { status } from '../view.ts';
 
-async function logout() {
+async function logout(): Promise<void> {
   if (clientDevice.pushBusy) return;
   lockDevice(true);
   clientDevice.deviceVersion++;

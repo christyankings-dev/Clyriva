@@ -1,9 +1,10 @@
-const $ = (s) => document.querySelector(s),
-  config = window.CLYRIVA_CONFIG || {};
+import { httpError } from '../../shared/lib/errors.ts';
+
+const config = window.CLYRIVA_CONFIG || {};
 
 const base = String(config.supabaseUrl || '').replace(/\/$/, '') + '/functions/v1/clyriva-client';
 
-const sb = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+const sb = window.supabase.createClient(config.supabaseUrl ?? '', config.supabaseAnonKey ?? '', {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
@@ -12,7 +13,12 @@ const sb = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonK
   },
 });
 
-async function api(action, data = {}) {
+type ApiReply<T> = T & { ok: true };
+
+async function api<T extends object = object>(
+  action: string,
+  data: object = {},
+): Promise<ApiReply<T>> {
   const {
     data: { session },
     error,
@@ -22,22 +28,19 @@ async function api(action, data = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      apikey: config.supabaseAnonKey,
+      apikey: config.supabaseAnonKey ?? '',
       Authorization: 'Bearer ' + session.access_token,
     },
     body: JSON.stringify(data),
     cache: 'no-store',
   });
-  let result = {};
+  let result: { ok?: boolean; error?: string } = {};
   try {
     result = await r.json();
   } catch {}
-  if (!r.ok || !result.ok) {
-    const error = Error(result.error || 'Serviço temporariamente indisponível.');
-    error.status = r.status;
-    throw error;
-  }
-  return result;
+  if (!r.ok || !result.ok)
+    throw httpError(result.error || 'Serviço temporariamente indisponível.', r.status);
+  return result as ApiReply<T>;
 }
 
-export { $, api, config, sb };
+export { api, config, sb };

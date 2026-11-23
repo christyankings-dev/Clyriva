@@ -1,17 +1,19 @@
-import { clientActivity, clientDevice, pushReceipt } from './state.js';
-import { $, sb } from '../api.js';
+import { clientActivity, clientDevice, pushReceipt } from './state.ts';
+import { must } from '../../../shared/lib/dom.ts';
+import type { PushTestRow } from '../../../shared/types/bridges.ts';
+import { sb } from '../api.ts';
 
-function showTest(row) {
+function showTest(row: PushTestRow | null): void {
   pushReceipt.latestTest = row;
   clearTimeout(pushReceipt.testTimer);
-  const result = $('#client-test-result');
+  const result = must('#client-test-result');
   result.hidden = !row;
   if (!row) {
     result.textContent = '';
     return;
   }
   if (row.state === 'shown') {
-    const shown = new Date(row.shownAt);
+    const shown = new Date(row.shownAt ?? 0);
     const time = shown.toLocaleTimeString('pt-BR', {
       hour: '2-digit',
       minute: '2-digit',
@@ -45,7 +47,7 @@ function showTest(row) {
   }
 }
 
-async function recoverTest() {
+async function recoverTest(): Promise<void> {
   if (!clientActivity.loaded) return;
   if (pushReceipt.latestTest && Date.now() - pushReceipt.latestTest.started >= 86400000)
     showTest(null);
@@ -76,12 +78,12 @@ async function recoverTest() {
   }
 }
 
-function testDisplayed(event) {
+function testDisplayed(event: MessageEvent): void {
   const message = event.data;
   if (
     !clientActivity.loaded ||
     event.origin !== location.origin ||
-    event.source?.scriptURL !== location.origin + '/sw.js'
+    (event.source as ServiceWorker | null)?.scriptURL !== location.origin + '/sw.js'
   )
     return;
   if (

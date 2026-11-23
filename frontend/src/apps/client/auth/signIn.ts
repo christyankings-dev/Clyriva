@@ -1,27 +1,30 @@
-import { clientActivity } from '../device/state.js';
-import { $, sb } from '../api.js';
-import { status } from '../view.js';
-import { refresh } from '../billing/refresh.js';
-import { clearClientScreen } from './clear.js';
+import { clientActivity } from '../device/state.ts';
+import { must } from '../../../shared/lib/dom.ts';
+import { errorInfo } from '../../../shared/lib/errors.ts';
+import { sb } from '../api.ts';
+import { status } from '../view.ts';
+import { refresh } from '../billing/refresh.ts';
+import { clearClientScreen } from './clear.ts';
 
-async function signIn(e) {
+async function signIn(e: SubmitEvent): Promise<void> {
   e.preventDefault();
   if (clientActivity.acting) return;
   clientActivity.acting = true;
-  const btn = $('#client-login button[type="submit"]'),
-    email = $('#c-email').value.trim().toLowerCase();
+  const btn = must<HTMLButtonElement>('#client-login button[type="submit"]'),
+    email = must<HTMLInputElement>('#c-email').value.trim().toLowerCase();
   btn.disabled = true;
   status('#login-feedback', 'Entrando…');
   try {
     const { error } = await sb.auth.signInWithPassword({
       email,
-      password: $('#c-password').value,
+      password: must<HTMLInputElement>('#c-password').value,
     });
     if (error) throw error;
     await refresh();
-    $('#c-password').value = '';
+    must<HTMLInputElement>('#c-password').value = '';
     status('#login-feedback', '');
-  } catch (err) {
+  } catch (e2) {
+    const err = errorInfo(e2);
     if (err.status === 403)
       await sb.auth
         .signOut({
@@ -29,7 +32,7 @@ async function signIn(e) {
         })
         .catch(() => {});
     clearClientScreen();
-    $('#c-email').value = email;
+    must<HTMLInputElement>('#c-email').value = email;
     const invalid =
       err.code === 'invalid_credentials' || /invalid login credentials/i.test(err.message || '');
     status(
