@@ -29,8 +29,8 @@ class IntegrityV25(unittest.TestCase):
             section = EDGE.split(marker, 1)[1].split("\n  }", 1)[0]
             self.assertIn(".is('source_type',null)", section, marker)
         assert_js(self, "linked=Boolean(n.source_type&&n.source_id)", ADMIN)
-        assert_js(self, "if(bill&&n.status==='paid'&&!linked)", ADMIN)
-        assert_js(self, "if(!linked){", ADMIN)
+        assert_js(self, "bill&&n.status==='paid'&&!linked", ADMIN)
+        assert_js(self, "{!linked&&(", ADMIN)
 
     def test_manual_archival_is_preserved(self):
         self.assertIn("if(action==='internal-sync'&&found?.status==='archived')", EDGE)

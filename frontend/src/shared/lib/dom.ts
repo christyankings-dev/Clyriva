@@ -15,3 +15,13 @@ export function must<T extends Element = HTMLElement>(
   if (!found) throw Error('Elemento não encontrado na página: ' + selector);
   return found;
 }
+
+/** Campo nomeado de um formulário (falha com mensagem clara se não existir). */
+export function field<T extends HTMLElement = HTMLInputElement>(
+  form: HTMLFormElement,
+  name: string,
+): T {
+  const found = form.elements.namedItem(name);
+  if (!(found instanceof HTMLElement)) throw Error('Campo não encontrado no formulário: ' + name);
+  return found as T;
+}

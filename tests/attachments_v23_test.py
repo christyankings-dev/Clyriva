@@ -41,7 +41,7 @@ class DocumentsV23(unittest.TestCase):
     self.assertIn('reminderText(current,stage',self.edge)
     self.assertNotIn('storage_path,admin_id,client_id',self.client)
   def test_notice_failure_does_not_duplicate_charge(self):
-    assert_js(self, 'f.dataset.editId=result.noticeId||payload.noticeId',self.admin)
-    assert_js(self, 'uploadAttachment(result.noticeId||payload.noticeId,file)',self.admin)
+    assert_js(self, 'f.dataset.editId=String(result.noticeId||payload.noticeId)',self.admin)
+    assert_js(self, 'uploadAttachment(String(result.noticeId||payload.noticeId),file)',self.admin)
 
 if __name__=='__main__':unittest.main()

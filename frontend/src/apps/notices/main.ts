@@ -1,2 +1,2 @@
 import './index.css';
-import './start.js';
+import './start.ts';

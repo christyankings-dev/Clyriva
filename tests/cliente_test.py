@@ -38,7 +38,7 @@ class ClientPortalTests(unittest.TestCase):
         admin=source_text('apps/notices')
         self.assertIn('clyriva_admins',admin)
         self.assertIn("'/admin-' + action",admin)
-        self.assertIn("api('publish', data)",admin)
+        self.assertIn("api<NoticeReply>('publish', data)",admin)
         portal=source_text('apps/client')
         self.assertNotIn('clyriva_workspace',portal)
         self.assertNotIn('clyriva_vault',portal)

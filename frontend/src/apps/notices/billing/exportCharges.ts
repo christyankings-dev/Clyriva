@@ -1,6 +1,6 @@
-import { requests } from '../state.js';
-import { company } from '../selectors.js';
-import { fmtDate, moneyForInput, status } from '../ui.js';
+import { requests } from '../state.ts';
+import { company } from '../selectors.ts';
+import { fmtDate, moneyForInput, status } from '../ui.ts';
 
 function exportCharges() {
   const columns = [
@@ -14,7 +14,7 @@ function exportCharges() {
     'Observações',
     'Último lembrete',
   ];
-  const safe = (value) => {
+  const safe = (value: unknown): string => {
     let str = String(value ?? '').replace(/\r?\n/g, ' ');
     if (/^[=+@\-\t]/.test(str)) str = "'" + str;
     return '"' + str.replace(/"/g, '""') + '"';

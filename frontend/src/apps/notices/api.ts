@@ -1,7 +1,8 @@
-const $ = (s) => document.querySelector(s),
-  cfg = window.CLYRIVA_CONFIG || {};
+import { httpError } from '../../shared/lib/errors.ts';
 
-const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+const cfg = window.CLYRIVA_CONFIG || {};
+
+const client = window.supabase.createClient(cfg.supabaseUrl ?? '', cfg.supabaseAnonKey ?? '', {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
@@ -10,7 +11,10 @@ const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey
 
 const base = cfg.supabaseUrl + '/functions/v1/clyriva-client';
 
-async function api(action, data = {}) {
+async function api<T extends object = object>(
+  action: string,
+  data: object = {},
+): Promise<T & { ok: true }> {
   const {
     data: { session },
     error,
@@ -21,18 +25,18 @@ async function api(action, data = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      apikey: cfg.supabaseAnonKey,
+      apikey: cfg.supabaseAnonKey ?? '',
       Authorization: 'Bearer ' + session.access_token,
     },
     body: JSON.stringify(data),
     cache: 'no-store',
   });
-  let value = {};
+  let value: { ok?: boolean; error?: string } = {};
   try {
     value = await res.json();
   } catch {}
-  if (!res.ok || !value.ok) throw Error(value.error || 'Falha na operação.');
-  return value;
+  if (!res.ok || !value.ok) throw httpError(value.error || 'Falha na operação.', res.status);
+  return value as T & { ok: true };
 }
 
-export { $, api, client };
+export { api, client };
