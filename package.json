@@ -8,9 +8,13 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint frontend/src",
+    "lint:fix": "eslint frontend/src --fix",
+    "format": "prettier --write frontend/src frontend/*.html vite.config.mjs",
     "format:check": "prettier --check frontend/src frontend/*.html vite.config.mjs",
-    "test": "node tests/core_private_test.mjs && node tests/reminder_rules_test.mjs && node tests/worker_navigation.mjs && node tests/edge_integration_v22.mjs"
+    "check": "npm run typecheck && npm run lint && npm run format:check",
+    "test": "node --experimental-strip-types tests/core_private_test.mjs && node tests/reminder_rules_test.mjs && node tests/worker_navigation.mjs && node tests/edge_integration_v22.mjs"
   },
   "dependencies": {
     "react": "19.3.1",
@@ -18,7 +22,10 @@
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
+    "@supabase/supabase-js": "2.119.1",
     "@tailwindcss/vite": "4.3.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.3.0",
     "eslint": "9.39.5",
     "eslint-plugin-react": "7.37.5",
@@ -26,6 +33,8 @@
     "globals": "17.14.0",
     "prettier": "3.10.1",
     "tailwindcss": "4.3.5",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.74.0",
     "vite": "8.3.8"
   },
   "type": "module"
