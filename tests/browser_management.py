@@ -40,6 +40,7 @@ def suite(browser):
     page.locator("#auth-form button[type=submit]").click()
     frame = page.frame_locator("#admin-iframe")
     expect(frame.get_by_role("heading", level=1)).to_have_text("Sua gestão, em perspectiva")
+    expect(frame.get_by_text("Comece cadastrando seu primeiro cliente")).to_be_visible()
     frame.locator("[data-page=clients]").click()
     frame.locator("[data-action=new-client]").first.click()
     frame.locator("#f-name").fill("Escritório de teste")

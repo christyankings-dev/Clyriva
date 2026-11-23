@@ -176,23 +176,20 @@ function Dashboard() {
           icon="◈"
         />
       </section>
-      {`${
-        !panelWorkspace.data.clients.length ? (
-          <div className="summary-strip">
-            <div>
-              <strong>Comece cadastrando seu primeiro cliente</strong>
-              <p>
-                Depois registre as notas, recebimentos, despesas e obrigações para formar seus
-                indicadores.
-              </p>
-            </div>
-            <NewRecord entity="client">Cadastrar cliente</NewRecord>
+      {panelWorkspace.data.clients.length === 0 ? (
+        <div className="summary-strip">
+          <div>
+            <strong>Comece cadastrando seu primeiro cliente</strong>
+            <p>
+              Depois registre as notas, recebimentos, despesas e obrigações para formar seus
+              indicadores.
+            </p>
           </div>
-        ) : (
-          ''
-        )
-      }`}
-      {`${panelWorkspace.data.clients.length ? <OfficeAgenda /> : ''}`}
+          <NewRecord entity="client">Cadastrar cliente</NewRecord>
+        </div>
+      ) : (
+        <OfficeAgenda />
+      )}
       {portfolioFocus()}
       <div className="priority-overview">
         <strong>Carteira prioritária</strong>
